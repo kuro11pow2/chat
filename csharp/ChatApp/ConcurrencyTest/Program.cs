@@ -51,35 +51,44 @@ namespace ConcurrencyTest
 
             ulong sum = 0;
             for (ulong i = 0; i < totalSumCount; i++)
-                sum++;
+                sum += 2;
 
             watch.Stop();
-            //Console.WriteLine($"{watch.ElapsedMilliseconds,4}ms, {sum}");
+            Console.WriteLine($"{watch.ElapsedMilliseconds,4}ms, {sum}");
         }
-        public static void AddExample(ulong totalSumCount, ulong threadCount)
+        public static void ThreadAdd(ulong totalSumCount, ulong threadCount)
         {
-
             ulong sumPerThread = totalSumCount / threadCount;
+            ulong remain = totalSumCount % threadCount;
 
-            ulong[] results = new ulong[threadCount+1];
-            Thread[] threads = new Thread[threadCount+1];
+            if (remain > 0)
+                threadCount++;
+
+            ulong[] results = new ulong[threadCount];
+            Thread[] threads = new Thread[threadCount];
 
             for (ulong i = 0; i < threadCount; i++)
             {
                 ulong n = i;
-                threads[n] = new Thread(() =>
+
+                if (remain > 0 && i == threadCount - 1)
                 {
-                    for (ulong j = 0; j < sumPerThread; j++)
-                        results[n]++;
-                });
+                    threads[n] = new Thread(() =>
+                    {
+                        for (ulong j = 0; j < remain; j++)
+                            results[n] += 2;
+                    });
+                }
+                else
+                {
+                    threads[n] = new Thread(() =>
+                    {
+                        for (ulong j = 0; j < sumPerThread; j++)
+                            results[n] += 2;
+                    });
+                }
             }
 
-            ulong remain = totalSumCount % threadCount;
-            threads[threadCount] = new Thread(() =>
-            {
-                for (ulong j = 0; j < remain; j++)
-                    results[threadCount]++;
-            });
 
             Stopwatch watch = new Stopwatch();
             watch.Start();
@@ -96,15 +105,98 @@ namespace ConcurrencyTest
 
             watch.Stop();
 
-            //Console.WriteLine($"{watch.ElapsedMilliseconds, 4}ms, {threadCount}*{sumPerThread} + {remain} = {sum}");
+            Console.WriteLine($"{watch.ElapsedMilliseconds,4}ms, {threads.Length}, {sumPerThread}, {remain} = {sum}");
+        }
+        public static void TaskAdd(ulong totalSumCount, ulong threadCount)
+        {
+            ulong sumPerThread = totalSumCount / threadCount;
+            List<Task<ulong>> tasks = new List<Task<ulong>>();
+
+            for (ulong i = 0; i < threadCount; i++)
+            {
+                tasks.Add(new Task<ulong>(() =>
+                {
+                    ulong sum = 0;
+                    for (ulong j = 0; j < sumPerThread; j++)
+                        sum += 2;
+                    return sum;
+                }));
+            }
+
+            ulong remain = totalSumCount % threadCount;
+            if (remain > 0)
+                tasks.Add(new Task<ulong>(() => {
+                    ulong sum = 0;
+                    for (ulong j = 0; j < remain; j++)
+                        sum += 2;
+                    return sum;
+                }));
+
+
+            Stopwatch watch = new Stopwatch();
+            watch.Start();
+
+            foreach (var task in tasks)
+                task.Start();
+
+            ulong sum = 0;
+            foreach (var task in tasks)
+                sum += task.Result;
+
+            watch.Stop();
+
+            Console.WriteLine($"{watch.ElapsedMilliseconds,4}ms, {tasks.Count}, {sumPerThread}, {remain} = {sum}");
+        }
+
+        public static void TestAll()
+        {
+            ulong count = 100 * 1000 * 1000;
+            ulong maxThreadCount = 1;
+
+            Console.WriteLine("싱글 스레드 더하기");
+            SingleAdd(count);
+            Console.WriteLine("멀티 스레드 더하기");
+            for (ulong i = 0; i < maxThreadCount; i++)
+                ThreadAdd(count, i + 1);
+            Console.WriteLine("멀티 테스크 더하기");
+            for (ulong i = 0; i < maxThreadCount; i++)
+                TaskAdd(count, i + 1);
+        }
+
+        public static void ThreadSleep()
+        {
+            List<Thread> threads = new List<Thread>();
+
+            for (int i = 0; i < 10; i++)
+            {
+                //int timeout = 1000 * 1000 * 10 * (i + 1);
+                //Thread t = new Thread(() => { for (int j = 0; j < timeout; j++) { j += 2; j -= 2; } });
+
+                int timeout = 100 * (i + 1);
+                Thread t = new Thread(() => { Thread.Sleep(timeout); });
+                threads.Add(t);
+            }
+
+            Stopwatch sw = new Stopwatch();
+
+            sw.Start();
+            for (int i = 0; i < threads.Count; i++)
+            {
+                threads[i].Start();
+            }
+
+            for (int i = 0; i < threads.Count; i++)
+            {
+                threads[threads.Count - i - 1].Join();
+            }
+            sw.Stop();
         }
 
         public static void Main()
         {
-            ulong count = 10 * 1000 * 1000;
-            SingleAdd(count);
-            for (ulong i = 1; i < 16; i++)
-                AddExample(count, i);
+            ulong count = 100 * 1000 * 1000;
+            ulong maxThreadCount = 8;
+            TaskAdd(count, maxThreadCount);
         }
     }
 }
