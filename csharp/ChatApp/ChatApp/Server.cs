@@ -30,7 +30,7 @@ namespace ChatApp
         public void Init()
         {
             _listenSocket.StartBindAndListen(Port, Backlog);
-            Log.Print($"수신 시작", ChatLogLevel.RELEASE, $"{Context} {nameof(Init)}");
+            Log.Print($"수신 시작", ChatLogLevel.DEFAULT, $"{Context} {nameof(Init)}");
         }
         public async void AcceptAndRegister()
         {
@@ -45,7 +45,7 @@ namespace ChatApp
                     client = new SocketHandler(socket);
                     _clients.TryAdd(cid, client);
 
-                    Log.Print($"{cid} 등록됨", ChatLogLevel.RELEASE, $"{Context} {nameof(AcceptAndRegister)}");
+                    Log.Print($"{cid} 등록됨", ChatLogLevel.DEFAULT, $"{Context} {nameof(AcceptAndRegister)}");
                 }
                 catch
                 {
@@ -63,7 +63,7 @@ namespace ChatApp
                 while (true)
                 {
                     string message = await client.ReceiveAsync();
-                    Log.Print($"[{cid}->server]: {message}", ChatLogLevel.DEFAULT, $"{Context} {nameof(ReceiveAndBroadcast)}");
+                    Log.Print($"[{cid}->server]: {message}", ChatLogLevel.INFO, $"{Context} {nameof(ReceiveAndBroadcast)}");
 
                     List<Task> sendTasks = new List<Task>();
 
@@ -75,7 +75,7 @@ namespace ChatApp
                             Task.Run(async () => {
                                 string realMessage = $"[{cid}->{targetId}]: {message}";
                                 await target.SendAsync(realMessage);
-                                Log.Print($"[server->{targetId}]: \"{realMessage}\"", ChatLogLevel.INFO, $"{Context} {nameof(ReceiveAndBroadcast)}");
+                                Log.Print($"[server->{targetId}]: \"{realMessage}\"", ChatLogLevel.VERBOSE, $"{Context} {nameof(ReceiveAndBroadcast)}");
                             }
                         ));
                     }
@@ -89,7 +89,7 @@ namespace ChatApp
                 _clients.TryRemove(cid, out tmp);
                 tmp.Close();
 
-                Log.Print($"{cid} 제거됨", ChatLogLevel.RELEASE, $"{Context} {nameof(ReceiveAndBroadcast)}");
+                Log.Print($"{cid} 제거됨", ChatLogLevel.DEFAULT, $"{Context} {nameof(ReceiveAndBroadcast)}");
             }
         }
 

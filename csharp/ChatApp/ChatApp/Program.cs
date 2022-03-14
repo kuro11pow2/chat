@@ -28,7 +28,7 @@ namespace ChatApp
             Server server = new Server(port, backlog);
             server.Init();
             server.AcceptAndRegister();
-            RunMonitor(server);
+            //RunMonitor(server);
         }
         public static async void RunClients(int clientCount)
         {
@@ -66,15 +66,13 @@ namespace ChatApp
         }
         public static async Task Main(string[] args)
         {
-
             ThreadPool.SetMaxThreads(16, 1000);
-            Log.PrintHeader();
+            Log.PrintLevel = ChatLogLevel.RELEASE;
 
-            Log.PrintLevel = ChatLogLevel.INFO;
+            //Log.PrintHeader();
 
             RunServer();
-            RunClients(1000);
-            while (Console.ReadLine() != "exit") ;
+            RunClients(10);
 
             //await RunUserClient();
         }

@@ -27,33 +27,33 @@ namespace ChatApp
 
         public void StartBindAndListen(int port, int backlog)
         {
-            Log.Print($"start", ChatLogLevel.DEBUG, nameof(StartBindAndListen));
+            Log.Print($"start", ChatLogLevel.VERBOSE, nameof(StartBindAndListen));
 
             _socket.Bind(new IPEndPoint(IPAddress.Any, port));
             _socket.Listen(backlog);
 
-            Log.Print($"end: port {port}, backlog {backlog}", ChatLogLevel.DEBUG, nameof(StartBindAndListen));
+            Log.Print($"end: port {port}, backlog {backlog}", ChatLogLevel.VERBOSE, nameof(StartBindAndListen));
         }
         public async Task ConnectAsync(string listenerAddress, int port)
         {
-            Log.Print($"start", ChatLogLevel.DEBUG, nameof(ConnectAsync));
+            Log.Print($"start", ChatLogLevel.VERBOSE, nameof(ConnectAsync));
 
             await _socket.ConnectAsync(listenerAddress, port);
 
-            Log.Print($"end, listenerAddress {listenerAddress}, port {port}", ChatLogLevel.DEBUG, nameof(ConnectAsync));
+            Log.Print($"end, listenerAddress {listenerAddress}, port {port}", ChatLogLevel.VERBOSE, nameof(ConnectAsync));
         }
         public async Task<Socket> AcceptAsync()
         {
-            Log.Print($"start", ChatLogLevel.DEBUG, nameof(AcceptAsync));
+            Log.Print($"start", ChatLogLevel.VERBOSE, nameof(AcceptAsync));
 
             Socket socket = await _socket.AcceptAsync();
 
-            Log.Print($"end", ChatLogLevel.DEBUG, nameof(AcceptAsync));
+            Log.Print($"end", ChatLogLevel.VERBOSE, nameof(AcceptAsync));
             return socket;
         }
         public async Task SendAsync(string message)
         {
-            Log.Print($"start", ChatLogLevel.DEBUG, nameof(SendAsync));
+            Log.Print($"start", ChatLogLevel.VERBOSE, nameof(SendAsync));
 
             byte[] messageByte = Encoding.UTF8.GetBytes(message);
             int messageByteSize = messageByte.Length;
@@ -71,11 +71,11 @@ namespace ChatApp
                 totalSendByte += await _socket.SendAsync(sendData[totalSendByte..], SocketFlags.None);
             } while (totalSendByte < sendData.Length);
 
-            Log.Print($"end, message {message}, totalSendByte {totalSendByte}", ChatLogLevel.DEBUG, nameof(SendAsync));
+            Log.Print($"end, message {message}, totalSendByte {totalSendByte}", ChatLogLevel.VERBOSE, nameof(SendAsync));
         }
         public async Task<string> ReceiveAsync()
         {
-            Log.Print($"start", ChatLogLevel.DEBUG, nameof(ReceiveAsync));
+            Log.Print($"start", ChatLogLevel.VERBOSE, nameof(ReceiveAsync));
 
             byte[] packetSizeBuffer = new byte[4];
             int packetSizeLen = packetSizeBuffer.Length;
@@ -99,18 +99,18 @@ namespace ChatApp
             totalReceiveByte += receiveByte;
             string message = Encoding.UTF8.GetString(receiveBuffer);
 
-            Log.Print($"end, message {message}, totalReceiveByte {totalReceiveByte}", ChatLogLevel.DEBUG, nameof(ReceiveAsync));
+            Log.Print($"end, message {message}, totalReceiveByte {totalReceiveByte}", ChatLogLevel.VERBOSE, nameof(ReceiveAsync));
             return message;
         }
         public void Close() 
         {
-            Log.Print($"start", ChatLogLevel.DEBUG, nameof(Close));
+            Log.Print($"start", ChatLogLevel.VERBOSE, nameof(Close));
 
             _socket.Shutdown(SocketShutdown.Both);
             _socket.Disconnect(false);
             _socket.Close();
 
-            Log.Print($"end", ChatLogLevel.DEBUG, nameof(Close));
+            Log.Print($"end", ChatLogLevel.VERBOSE, nameof(Close));
         }
     }
 }

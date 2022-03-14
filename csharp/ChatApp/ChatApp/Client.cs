@@ -26,17 +26,17 @@ namespace ChatApp
         public async Task Init()
         {
             await _socket.ConnectAsync(TargetAddress, TargetPort);
-            Log.Print($"{Cid} 연결됨", ChatLogLevel.RELEASE, $"{Context} {nameof(Init)}");
+            Log.Print($"{Cid} 연결됨", ChatLogLevel.DEFAULT, $"{Context} {nameof(Init)}");
         }
         public async Task SendAsync(string message)
         {
             await _socket.SendAsync(message);
-            Log.Print($"[{Cid}->server] \"{message}\"", ChatLogLevel.DEFAULT, $"{Context} {nameof(SendAsync)}");
+            Log.Print($"[{Cid}->server] \"{message}\"", ChatLogLevel.INFO, $"{Context} {nameof(SendAsync)}");
         }
         public async Task<string> ReceiveAsync()
         {
             string message = await _socket.ReceiveAsync();
-            Log.Print($"[server->{Cid}] \"{message}\"", ChatLogLevel.DEFAULT, $"{Context} {nameof(ReceiveAsync)}");
+            Log.Print($"[server->{Cid}] \"{message}\"", ChatLogLevel.INFO, $"{Context} {nameof(ReceiveAsync)}");
             return message;
         }
     }
