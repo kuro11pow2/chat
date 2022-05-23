@@ -5,44 +5,72 @@ using System.Threading.Tasks;
 using System.Text;
 using System.IO;
 
-
-namespace echo_server
+namespace simple_client
 {
     internal class Program
     {
+        static bool isConnected = true;
+
         static void Main(string[] args)
         {
             Log.PrintLevel = LogLevel.DEBUG;
 
             Log.PrintHeader();
 
-            AysncEchoServer().Wait();
-        }
-
-        async static Task AysncEchoServer()
-        {
-            TcpListener listener = new TcpListener(IPAddress.Any, 7000);
-            listener.Start();
             while (true)
             {
-                // 비동기 Accept                
-                TcpClient tc = await listener.AcceptTcpClientAsync();
-
-                //tc.SendTimeout = 1000;
-                //tc.ReceiveTimeout = 1000;
-
-                // 새 쓰레드에서 처리
-                _ = Task.Run(() =>
+                try
                 {
-                    AsyncTcpEcho(tc);
-                });
+                    TcpClient tc = new TcpClient("localhost", 7000);
+
+                    //tc.SendTimeout = 1000;
+                    //tc.ReceiveTimeout = 1000;
+
+                    NetworkStream stream = tc.GetStream();
+
+                    AsyncTcpReceive(stream);
+                    AsyncTcpSend(stream).Wait();
+
+                    stream.Close();
+                    tc.Close();
+                }
+                catch (Exception ex)
+                {
+                    Log.Print($"연결 종료\n{ex}");
+                }
             }
         }
 
-        async static void AsyncTcpEcho(TcpClient tc)
+        async static Task AsyncTcpSend(NetworkStream stream)
         {
-            NetworkStream stream = tc.GetStream();
+            ushort maxMsgBufferLength = 0xFFFF;
+            ushort sizeBuffLength = 2;
 
+            while (isConnected)
+            {
+                string msg = Console.ReadLine();
+                byte[] tmpBytes = Encoding.UTF8.GetBytes(msg);
+
+                if (tmpBytes.Length > maxMsgBufferLength)
+                {
+                    Log.Print($"메세지가 너무 깁니다. {maxMsgBufferLength} 이하로 입력하세요.");
+                    continue;
+                }
+
+                ushort msgBufferLength = (ushort)tmpBytes.Length;
+
+                byte[] sizeBytes = BitConverter.GetBytes(msgBufferLength)[..2];
+                byte[] buff = new byte[sizeBuffLength + msgBufferLength];
+
+                Buffer.BlockCopy(sizeBytes, 0, buff, 0, sizeBytes.Length);
+                Buffer.BlockCopy(tmpBytes, 0, buff, sizeBytes.Length, tmpBytes.Length);
+
+                await stream.WriteAsync(buff, 0, buff.Length);
+            }
+        }
+
+        async static void AsyncTcpReceive(NetworkStream stream)
+        {
             // 비동기 수신
             ushort msgBufferLength = 0xFFFF;
             var msgBuff = new byte[msgBufferLength];
@@ -145,27 +173,16 @@ namespace echo_server
 
                         Log.Print($"{msg} at {DateTime.Now}");
 
-                        byte[] fullBuff = new byte[sizeBuff.Length + msgSize];
-                        Buffer.BlockCopy(sizeBuff, 0, fullBuff, 0, sizeBuff.Length);
-                        Buffer.BlockCopy(msgBuff, 0, fullBuff, sizeBuff.Length, msgSize);
-
-                        // 비동기 송신
-                        await stream.WriteAsync(fullBuff, 0, fullBuff.Length);
-
                         break;
                     }
 
                     receivedMsgBuffLength = 0;
                 }
-
-                stream.Close();
-                tc.Close();
             }
             catch (Exception ex)
             {
                 Log.Print($"연결 종료\n{ex}");
             }
         }
-
     }
 }
