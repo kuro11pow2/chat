@@ -7,6 +7,46 @@ using System.IO;
 
 namespace simple_client
 {
+    class PayloadEncoder
+    {
+
+        /// <summary>
+        /// 메시지 크기 버퍼 최대 길이. 4 bytes 이하 (int 제약)
+        /// </summary>
+        public const int MAX_SIZE_BUFFER_LENGTH = 1;
+        /// <summary>
+        /// 메시지 버퍼 최대 길이. 2^(8 * MAX_SIZE_BUFFER_LENGTH)-1
+        /// </summary>
+        public static int MAX_MESSAGE_BUFFER_LENGTH = 1 << (8 * MAX_SIZE_BUFFER_LENGTH) - 1;
+
+        public static int SizeBuffer2Num(byte[] sizeBuffer)
+        {
+            int ret = 0;
+            for (int i = 0; i < sizeBuffer.Length; i++)
+            {
+                ret <<= 1;
+                ret += sizeBuffer[i];
+            }
+            return ret;
+        }
+
+        public static byte[] Num2SizeBuffer(int sizeBufferLength)
+        {
+            return BitConverter.GetBytes(sizeBufferLength)[..MAX_SIZE_BUFFER_LENGTH];
+        }
+
+        public static string GetString(byte[] bytes, int index, int count)
+        {
+            return Encoding.UTF8.GetString(bytes, index, count);
+        }
+
+        public static byte[] GetBytes(string str)
+        {
+            return Encoding.UTF8.GetBytes(str);
+        }
+
+    }
+
     internal class Program
     {
         static bool isConnected = true;
@@ -43,42 +83,40 @@ namespace simple_client
 
         async static Task AsyncTcpSend(NetworkStream stream)
         {
-            ushort maxMsgBufferLength = 0xFFFF;
-            ushort sizeBuffLength = 2;
 
             while (isConnected)
             {
                 string msg = Console.ReadLine();
-                byte[] tmpBytes = Encoding.UTF8.GetBytes(msg);
+                byte[] tmpBytes = PayloadEncoder.GetBytes(msg);
 
-                if (tmpBytes.Length > maxMsgBufferLength)
+                if (tmpBytes.Length > PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH)
                 {
-                    Log.Print($"메세지가 너무 깁니다. {maxMsgBufferLength} 이하로 입력하세요.");
+                    Log.Print($"메시지가 너무 깁니다. {PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH} 이하로 입력하세요.");
                     continue;
                 }
 
-                ushort msgBufferLength = (ushort)tmpBytes.Length;
+                int msgBufferLength = tmpBytes.Length;
 
-                byte[] sizeBytes = BitConverter.GetBytes(msgBufferLength)[..2];
-                byte[] buff = new byte[sizeBuffLength + msgBufferLength];
+                byte[] sizeBytes = PayloadEncoder.Num2SizeBuffer(msgBufferLength);
+                byte[] fullBuffer = new byte[PayloadEncoder.MAX_SIZE_BUFFER_LENGTH + msgBufferLength];
 
-                Buffer.BlockCopy(sizeBytes, 0, buff, 0, sizeBytes.Length);
-                Buffer.BlockCopy(tmpBytes, 0, buff, sizeBytes.Length, tmpBytes.Length);
+                Buffer.BlockCopy(sizeBytes, 0, fullBuffer, 0, sizeBytes.Length);
+                Buffer.BlockCopy(tmpBytes, 0, fullBuffer, sizeBytes.Length, tmpBytes.Length);
 
-                await stream.WriteAsync(buff, 0, buff.Length);
+                Log.Print($"송신: 사이즈 ({PayloadEncoder.SizeBuffer2Num(sizeBytes)}), 메시지 ({PayloadEncoder.GetString(tmpBytes, 0, tmpBytes.Length)})");
+
+                await stream.WriteAsync(fullBuffer, 0, fullBuffer.Length);
             }
         }
 
         async static void AsyncTcpReceive(NetworkStream stream)
         {
             // 비동기 수신
-            ushort msgBufferLength = 0xFFFF;
-            var msgBuff = new byte[msgBufferLength];
+            var msgBuff = new byte[PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH];
             string msg = "";
             int receivedMsgBuffLength = 0;
 
-            int sizeBuffLength = 2;
-            byte[] sizeBuff = new byte[sizeBuffLength];
+            byte[] sizeBuff = new byte[PayloadEncoder.MAX_SIZE_BUFFER_LENGTH];
             int msgSize = 0;
             int sizeReceivedBuffLength = 0;
 
@@ -92,7 +130,7 @@ namespace simple_client
                 {
                     while (isConnected)
                     {
-                        currentReceived = await stream.ReadAsync(sizeBuff, sizeReceivedBuffLength, sizeBuffLength - sizeReceivedBuffLength);
+                        currentReceived = await stream.ReadAsync(sizeBuff, sizeReceivedBuffLength, PayloadEncoder.MAX_SIZE_BUFFER_LENGTH - sizeReceivedBuffLength);
                         sizeReceivedBuffLength += currentReceived;
                         Log.Print($"sizeReceivedBuffLength: {sizeReceivedBuffLength}");
 
@@ -102,22 +140,22 @@ namespace simple_client
                             isConnected = false;
                             continue;
                         }
-                        else if (sizeReceivedBuffLength < sizeBuffLength)
+                        else if (sizeReceivedBuffLength < PayloadEncoder.MAX_SIZE_BUFFER_LENGTH)
                         {
                             continue;
                         }
-                        else if (sizeReceivedBuffLength > sizeBuffLength)
+                        else if (sizeReceivedBuffLength > PayloadEncoder.MAX_SIZE_BUFFER_LENGTH)
                         {
                             Log.Print("메세지 사이즈 버퍼 크기를 초과하여 수신함");
                             isConnected = false;
                             continue;
                         }
 
-                        msgSize = BitConverter.ToInt16(sizeBuff);
+                        msgSize = PayloadEncoder.SizeBuffer2Num(sizeBuff);
 
-                        if (msgSize > msgBufferLength)
+                        if (msgSize > PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH)
                         {
-                            Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : msgSize({msgSize}) > msgBufferLength({msgBufferLength})");
+                            Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : msgSize({msgSize}) > msgBufferLength({PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH})");
                             isOverflow = true;
                         }
 
@@ -130,7 +168,7 @@ namespace simple_client
                     {
                         if (isOverflow) // 메세지 버퍼 크기 초과하여 수신하려 한 케이스의 입력을 모두 제거
                         {
-                            currentReceived = await stream.ReadAsync(msgBuff, 0, Math.Min(msgBufferLength, msgSize - receivedMsgBuffLength));
+                            currentReceived = await stream.ReadAsync(msgBuff, 0, Math.Min(PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH, msgSize - receivedMsgBuffLength));
                             receivedMsgBuffLength += currentReceived;
 
                             if (currentReceived == 0)
@@ -169,7 +207,7 @@ namespace simple_client
                             continue;
                         }
 
-                        msg = Encoding.UTF8.GetString(msgBuff, 0, msgSize);
+                        msg = PayloadEncoder.GetString(msgBuff, 0, msgSize);
 
                         Log.Print($"{msg} at {DateTime.Now}");
 
