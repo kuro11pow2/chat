@@ -15,26 +15,26 @@ namespace echo_server
         /// <summary>
         /// 메시지 크기 버퍼 최대 길이. 4 bytes 이하 (int 제약)
         /// </summary>
-        public const int MAX_SIZE_BUFFER_LENGTH = 1;
+        public const int MAX_SIZE_BYTES_LENGTH = 1;
         /// <summary>
-        /// 메시지 버퍼 최대 길이. 2^(8 * MAX_SIZE_BUFFER_LENGTH)-1
+        /// 메시지 버퍼 최대 길이. 2^(8 * MAX_SIZE_BYTES_LENGTH)-1
         /// </summary>
-        public static int MAX_MESSAGE_BUFFER_LENGTH = 1 << (8 * MAX_SIZE_BUFFER_LENGTH) - 1;
+        public static int MAX_MESSAGE_BYTES_LENGTH = 1 << (8 * MAX_SIZE_BYTES_LENGTH) - 1;
 
-        public static int SizeBuffer2Num(byte[] sizeBuffer)
+        public static int Bytes2Num(byte[] SizeBytes)
         {
             int ret = 0;
-            for (int i = 0; i < sizeBuffer.Length; i++)
+            for (int i = 0; i < SizeBytes.Length; i++)
             {
                 ret <<= 1;
-                ret += sizeBuffer[i];
+                ret += SizeBytes[i];
             }
             return ret;
         }
 
-        public static byte[] Num2SizeBuffer(int sizeBufferLength)
+        public static byte[] Num2SizeBytes(int num)
         {
-            return BitConverter.GetBytes(sizeBufferLength)[..MAX_SIZE_BUFFER_LENGTH];
+            return BitConverter.GetBytes(num)[..MAX_SIZE_BYTES_LENGTH];
         }
 
         public static string GetString(byte[] bytes, int index, int count)
@@ -59,19 +59,19 @@ namespace echo_server
     {
         public bool isConnected { get; set; }
         public bool isOverflow { get; set; }
-        public int expectedMessageLength { get; set; }
-        public byte[] sizeBuffer { get; set; }
-        public byte[] messageBuffer { get; set; }
-        public string fullMessage { get; set; }
+        public int expectedMessageBytesLength { get; set; }
+        public byte[] sizeBytes { get; set; }
+        public byte[] messageBytes { get; set; }
+        public string fullMessageBytes { get; set; }
 
         public ReceiveContext()
         {
             isConnected = true;
             isOverflow = false;
-            expectedMessageLength = 0;
-            sizeBuffer = new byte[PayloadEncoder.MAX_SIZE_BUFFER_LENGTH];
-            messageBuffer = new byte[PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH];
-            fullMessage = "";
+            expectedMessageBytesLength = 0;
+            sizeBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH];
+            messageBytes = new byte[PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH];
+            fullMessageBytes = "";
         }
     }
 
@@ -102,7 +102,6 @@ namespace echo_server
         }
 
 
-
         private async Task ReceiveSize(NetworkStream stream, ReceiveContext context)
         {
             if (!context.isConnected)
@@ -111,15 +110,15 @@ namespace echo_server
                 return;
             }
 
-            int receivedSizeBufferLength = 0;
+            int receivedSizeBytesLength = 0;
 
             while (context.isConnected)
             {
                 int currentReceived;
 
-                currentReceived = await stream.ReadAsync(context.sizeBuffer, receivedSizeBufferLength, PayloadEncoder.MAX_SIZE_BUFFER_LENGTH - receivedSizeBufferLength);
-                receivedSizeBufferLength += currentReceived;
-                Log.Print($"sizeReceivedBuffLength: {receivedSizeBufferLength}", LogLevel.INFO);
+                currentReceived = await stream.ReadAsync(context.sizeBytes, receivedSizeBytesLength, PayloadEncoder.MAX_SIZE_BYTES_LENGTH - receivedSizeBytesLength);
+                receivedSizeBytesLength += currentReceived;
+                Log.Print($"sizeReceivedBuffLength: {receivedSizeBytesLength}", LogLevel.INFO);
 
                 if (currentReceived == 0)
                 {
@@ -127,18 +126,18 @@ namespace echo_server
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedSizeBufferLength > PayloadEncoder.MAX_SIZE_BUFFER_LENGTH)
+                else if (receivedSizeBytesLength > PayloadEncoder.MAX_SIZE_BYTES_LENGTH)
                 {
                     Log.Print("받기로 한 것보다 큰 메시지 크기 바이트를 수신함", LogLevel.WARN);
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedSizeBufferLength < PayloadEncoder.MAX_SIZE_BUFFER_LENGTH)
+                else if (receivedSizeBytesLength < PayloadEncoder.MAX_SIZE_BYTES_LENGTH)
                 {
                     continue;
                 }
 
-                context.expectedMessageLength = PayloadEncoder.SizeBuffer2Num(context.sizeBuffer);
+                context.expectedMessageBytesLength = PayloadEncoder.Bytes2Num(context.sizeBytes);
 
                 break;
             }
@@ -152,22 +151,22 @@ namespace echo_server
                 return;
             }
 
-            int receivedMessageBufferLength = 0;
+            int receivedMessageBytesLength = 0;
             int currentReceived;
 
             while (context.isOverflow && context.isConnected)
             {
-                int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH, context.expectedMessageLength - receivedMessageBufferLength);
-                currentReceived = await stream.ReadAsync(context.messageBuffer, 0, maxReceiveLength);
-                receivedMessageBufferLength += currentReceived;
-                Log.Print($"오버플로된 수신 메시지 : {PayloadEncoder.GetString(context.messageBuffer, 0, maxReceiveLength)}", LogLevel.WARN);
+                int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH, context.expectedMessageBytesLength - receivedMessageBytesLength);
+                currentReceived = await stream.ReadAsync(context.messageBytes, 0, maxReceiveLength);
+                receivedMessageBytesLength += currentReceived;
+                Log.Print($"오버플로된 수신 메시지 : {PayloadEncoder.GetString(context.messageBytes, 0, maxReceiveLength)}", LogLevel.WARN);
 
                 if (currentReceived == 0)
                 {
                     Log.Print("0 byte 수신하여 종료", LogLevel.INFO);
                     context.isConnected = false;
                 }
-                else if (receivedMessageBufferLength == context.expectedMessageLength)
+                else if (receivedMessageBytesLength == context.expectedMessageBytesLength)
                 {
                     Log.Print("오버플로된 수신 메시지를 모두 소진함", LogLevel.INFO);
                     context.isOverflow = false;
@@ -183,13 +182,13 @@ namespace echo_server
                 return;
             }
 
-            int receivedMessageBufferLength = 0;
+            int receivedMessageBytesLength = 0;
 
             while (context.isConnected)
             {
-                int currentReceived = await stream.ReadAsync(context.messageBuffer, receivedMessageBufferLength, context.expectedMessageLength - receivedMessageBufferLength);
-                receivedMessageBufferLength += currentReceived;
-                Log.Print($"receivedMsgBuffLength: {receivedMessageBufferLength}", LogLevel.INFO);
+                int currentReceived = await stream.ReadAsync(context.messageBytes, receivedMessageBytesLength, context.expectedMessageBytesLength - receivedMessageBytesLength);
+                receivedMessageBytesLength += currentReceived;
+                Log.Print($"receivedMsgBuffLength: {receivedMessageBytesLength}", LogLevel.INFO);
 
                 if (currentReceived == 0)
                 {
@@ -197,20 +196,20 @@ namespace echo_server
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedMessageBufferLength > context.expectedMessageLength)
+                else if (receivedMessageBytesLength > context.expectedMessageBytesLength)
                 {
                     Log.Print("받기로 한 것보다 큰 메시지 바이트를 수신함", LogLevel.WARN);
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedMessageBufferLength < context.expectedMessageLength)
+                else if (receivedMessageBytesLength < context.expectedMessageBytesLength)
                 {
                     continue;
                 }
 
-                context.fullMessage = PayloadEncoder.GetString(context.messageBuffer, 0, context.expectedMessageLength);
+                context.fullMessageBytes = PayloadEncoder.GetString(context.messageBytes, 0, context.expectedMessageBytesLength);
 
-                Log.Print($"{context.fullMessage} at {DateTime.Now}", LogLevel.INFO);
+                Log.Print($"{context.fullMessageBytes} at {DateTime.Now}", LogLevel.INFO);
 
                 break;
             }
@@ -224,14 +223,14 @@ namespace echo_server
                 return;
             }
 
-            byte[] fullBuffer = new byte[context.sizeBuffer.Length + context.expectedMessageLength];
-            Buffer.BlockCopy(context.sizeBuffer, 0, fullBuffer, 0, context.sizeBuffer.Length);
-            Buffer.BlockCopy(context.messageBuffer, 0, fullBuffer, context.sizeBuffer.Length, context.expectedMessageLength);
+            byte[] fullBytes = new byte[context.sizeBytes.Length + context.expectedMessageBytesLength];
+            Buffer.BlockCopy(context.sizeBytes, 0, fullBytes, 0, context.sizeBytes.Length);
+            Buffer.BlockCopy(context.messageBytes, 0, fullBytes, context.sizeBytes.Length, context.expectedMessageBytesLength);
 
-            Log.Print($"송신: 사이즈 ({PayloadEncoder.SizeBuffer2Num(context.sizeBuffer)}), 메시지 ({PayloadEncoder.GetString(context.messageBuffer, 0, context.expectedMessageLength)})", LogLevel.INFO);
+            Log.Print($"송신: 사이즈 ({PayloadEncoder.Bytes2Num(context.sizeBytes)}), 메시지 ({PayloadEncoder.GetString(context.messageBytes, 0, context.expectedMessageBytesLength)})", LogLevel.INFO);
 
             // 비동기 송신
-            await stream.WriteAsync(fullBuffer, 0, fullBuffer.Length);
+            await stream.WriteAsync(fullBytes, 0, fullBytes.Length);
         }
 
         private async Task SendMessage(NetworkStream stream, ReceiveContext context, string message)
@@ -242,28 +241,28 @@ namespace echo_server
                 return;
             }
 
-            byte[] messageBuffer = PayloadEncoder.GetBytes(message);
-            int messageBufferLength = messageBuffer.Length;
+            byte[] messageBytes = PayloadEncoder.GetBytes(message);
+            int messageBytesLength = messageBytes.Length;
 
-            byte[] sizeBuffer = PayloadEncoder.Num2SizeBuffer(messageBufferLength);
-            byte[] fullBuffer = new byte[PayloadEncoder.MAX_SIZE_BUFFER_LENGTH + messageBufferLength];
+            byte[] sizeBytes = PayloadEncoder.Num2SizeBytes(messageBytesLength);
+            byte[] fullBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH + messageBytesLength];
 
-            Buffer.BlockCopy(sizeBuffer, 0, fullBuffer, 0, sizeBuffer.Length);
-            Buffer.BlockCopy(messageBuffer, 0, fullBuffer, sizeBuffer.Length, messageBuffer.Length);
+            Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
+            Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
 
-            Log.Print($"송신: 사이즈 ({PayloadEncoder.SizeBuffer2Num(sizeBuffer)}), 메시지 ({PayloadEncoder.GetString(messageBuffer, 0, messageBuffer.Length)})", LogLevel.INFO);
+            Log.Print($"송신: 사이즈 ({PayloadEncoder.Bytes2Num(sizeBytes)}), 메시지 ({PayloadEncoder.GetString(messageBytes, 0, messageBytes.Length)})", LogLevel.INFO);
 
             // 비동기 송신
-            await stream.WriteAsync(fullBuffer, 0, fullBuffer.Length);
+            await stream.WriteAsync(fullBytes, 0, fullBytes.Length);
         }
 
         private async Task ReceiveMessage(NetworkStream stream, ReceiveContext context)
         {
             await ReceiveSize(stream, context);
 
-            if (context.expectedMessageLength > PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH)
+            if (context.expectedMessageBytesLength > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
             {
-                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.expectedMessageLength}) > MESSAGE_BUFFER_LENGTH({PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH})", LogLevel.WARN);
+                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH})", LogLevel.WARN);
                 context.isOverflow = true;
                 await RemoveOverflow(stream, context);
                 return;
