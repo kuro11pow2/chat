@@ -6,6 +6,7 @@ namespace simple_client
     public enum LogLevel
     {
         ERROR,
+        WARN,
         INFO,
         DEBUG
     }
@@ -49,6 +50,8 @@ namespace simple_client
             {
                 case LogLevel.ERROR:
                     return "ERROR";
+                case LogLevel.WARN:
+                    return "WARM";
                 case LogLevel.INFO:
                     return "INFO";
                 case LogLevel.DEBUG:

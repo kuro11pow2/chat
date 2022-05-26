@@ -92,7 +92,7 @@ namespace simple_client
                 if (tmpBytes.Length > PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH)
                 {
                     Log.Print($"메시지가 너무 깁니다. {PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH} 이하로 입력하세요.");
-                    continue;
+                    //continue;
                 }
 
                 int msgBufferLength = tmpBytes.Length;
@@ -131,6 +131,7 @@ namespace simple_client
                     while (isConnected)
                     {
                         currentReceived = await stream.ReadAsync(sizeBuff, sizeReceivedBuffLength, PayloadEncoder.MAX_SIZE_BUFFER_LENGTH - sizeReceivedBuffLength);
+               
                         sizeReceivedBuffLength += currentReceived;
                         Log.Print($"sizeReceivedBuffLength: {sizeReceivedBuffLength}");
 

@@ -59,7 +59,7 @@ namespace echo_server
     {
         public bool isConnected { get; set; }
         public bool isOverflow { get; set; }
-        public int messageLength { get; set; }
+        public int expectedMessageLength { get; set; }
         public byte[] sizeBuffer { get; set; }
         public byte[] messageBuffer { get; set; }
         public string fullMessage { get; set; }
@@ -68,7 +68,7 @@ namespace echo_server
         {
             isConnected = true;
             isOverflow = false;
-            messageLength = 0;
+            expectedMessageLength = 0;
             sizeBuffer = new byte[PayloadEncoder.MAX_SIZE_BUFFER_LENGTH];
             messageBuffer = new byte[PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH];
             fullMessage = "";
@@ -77,8 +77,6 @@ namespace echo_server
 
     class Server
     {
-        
-
         TcpListener listener;
 
         public Server()
@@ -104,8 +102,15 @@ namespace echo_server
         }
 
 
+
         private async Task ReceiveSize(NetworkStream stream, ReceiveContext context)
         {
+            if (!context.isConnected)
+            {
+                Log.Print("연결이 끊겨있어 메시지 크기를 수신할 수 없음", LogLevel.WARN);
+                return;
+            }
+
             int receivedSizeBufferLength = 0;
 
             while (context.isConnected)
@@ -114,11 +119,17 @@ namespace echo_server
 
                 currentReceived = await stream.ReadAsync(context.sizeBuffer, receivedSizeBufferLength, PayloadEncoder.MAX_SIZE_BUFFER_LENGTH - receivedSizeBufferLength);
                 receivedSizeBufferLength += currentReceived;
-                Log.Print($"sizeReceivedBuffLength: {receivedSizeBufferLength}");
+                Log.Print($"sizeReceivedBuffLength: {receivedSizeBufferLength}", LogLevel.INFO);
 
                 if (currentReceived == 0)
                 {
-                    Log.Print("0 byte 수신하여 종료");
+                    Log.Print("0 byte 수신하여 종료", LogLevel.INFO);
+                    context.isConnected = false;
+                    continue;
+                }
+                else if (receivedSizeBufferLength > PayloadEncoder.MAX_SIZE_BUFFER_LENGTH)
+                {
+                    Log.Print("받기로 한 것보다 큰 메시지 크기 바이트를 수신함", LogLevel.WARN);
                     context.isConnected = false;
                     continue;
                 }
@@ -126,98 +137,140 @@ namespace echo_server
                 {
                     continue;
                 }
-                else if (receivedSizeBufferLength > PayloadEncoder.MAX_SIZE_BUFFER_LENGTH)
-                {
-                    Log.Print("메세지 사이즈 버퍼 크기를 초과하여 수신함");
-                    context.isConnected = false;
-                    continue;
-                }
 
-                context.messageLength = PayloadEncoder.SizeBuffer2Num(context.sizeBuffer);
-
-                if (context.messageLength > PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH)
-                {
-                    Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : messageLength({context.messageLength}) > MESSAGE_BUFFER_LENGTH({PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH})");
-                    context.isOverflow = true;
-                }
+                context.expectedMessageLength = PayloadEncoder.SizeBuffer2Num(context.sizeBuffer);
 
                 break;
             }
         }
 
-        private async Task ReceiveMessage(NetworkStream stream, ReceiveContext context)
+        private async Task RemoveOverflow(NetworkStream stream, ReceiveContext context)
         {
+            if (!context.isConnected)
+            {
+                Log.Print("연결이 끊겨있어 오버플로된 수신 메시지를 소진할 수 없음", LogLevel.WARN);
+                return;
+            }
+
+            int receivedMessageBufferLength = 0;
+            int currentReceived;
+
+            while (context.isOverflow && context.isConnected)
+            {
+                int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH, context.expectedMessageLength - receivedMessageBufferLength);
+                currentReceived = await stream.ReadAsync(context.messageBuffer, 0, maxReceiveLength);
+                receivedMessageBufferLength += currentReceived;
+                Log.Print($"오버플로된 수신 메시지 : {PayloadEncoder.GetString(context.messageBuffer, 0, maxReceiveLength)}", LogLevel.WARN);
+
+                if (currentReceived == 0)
+                {
+                    Log.Print("0 byte 수신하여 종료", LogLevel.INFO);
+                    context.isConnected = false;
+                }
+                else if (receivedMessageBufferLength == context.expectedMessageLength)
+                {
+                    Log.Print("오버플로된 수신 메시지를 모두 소진함", LogLevel.INFO);
+                    context.isOverflow = false;
+                }
+            }
+        }
+
+        private async Task ReceiveExpect(NetworkStream stream, ReceiveContext context)
+        {
+            if (!context.isConnected)
+            {
+                Log.Print("연결이 끊겨있어 메시지를 수신할 수 없음", LogLevel.WARN);
+                return;
+            }
+
             int receivedMessageBufferLength = 0;
 
             while (context.isConnected)
             {
-                int currentReceived;
-
-                if (context.isOverflow) // 메세지 버퍼 크기 초과하여 수신하려 한 케이스의 입력을 모두 제거
-                {
-                    int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH, context.messageLength - receivedMessageBufferLength);
-                    currentReceived = await stream.ReadAsync(context.messageBuffer, 0, maxReceiveLength);
-                    receivedMessageBufferLength += currentReceived;
-
-                    Log.Print($"오버플로 소진 : {PayloadEncoder.GetString(context.messageBuffer, 0, maxReceiveLength)}");
-
-
-                    if (currentReceived == 0)
-                    {
-                        context.isConnected = false;
-                    }
-                    else if (receivedMessageBufferLength == context.messageLength)
-                    {
-                        context.isOverflow = false;
-                        break;
-                    }
-
-                    continue;
-                }
-
-                currentReceived = await stream.ReadAsync(context.messageBuffer, receivedMessageBufferLength, context.messageLength - receivedMessageBufferLength);
+                int currentReceived = await stream.ReadAsync(context.messageBuffer, receivedMessageBufferLength, context.expectedMessageLength - receivedMessageBufferLength);
+                receivedMessageBufferLength += currentReceived;
+                Log.Print($"receivedMsgBuffLength: {receivedMessageBufferLength}", LogLevel.INFO);
 
                 if (currentReceived == 0)
                 {
-                    Log.Print("0 byte 수신하여 종료");
+                    Log.Print("0 byte 수신하여 종료", LogLevel.INFO);
                     context.isConnected = false;
                     continue;
                 }
-
-                receivedMessageBufferLength += currentReceived;
-                Log.Print($"receivedMsgBuffLength: {receivedMessageBufferLength}");
-
-                if (receivedMessageBufferLength < context.messageLength)
+                else if (receivedMessageBufferLength > context.expectedMessageLength)
                 {
-                    continue;
-                }
-                else if (receivedMessageBufferLength > context.messageLength)
-                {
-                    Log.Print("받기로 한 것보다 많은 데이터를 수신함");
+                    Log.Print("받기로 한 것보다 큰 메시지 바이트를 수신함", LogLevel.WARN);
                     context.isConnected = false;
                     continue;
                 }
+                else if (receivedMessageBufferLength < context.expectedMessageLength)
+                {
+                    continue;
+                }
 
-                context.fullMessage = PayloadEncoder.GetString(context.messageBuffer, 0, context.messageLength);
+                context.fullMessage = PayloadEncoder.GetString(context.messageBuffer, 0, context.expectedMessageLength);
 
-                Log.Print($"{context.fullMessage} at {DateTime.Now}");
-
-                _ = EchoSendMessage(stream, context);
+                Log.Print($"{context.fullMessage} at {DateTime.Now}", LogLevel.INFO);
 
                 break;
             }
         }
 
-        private async Task EchoSendMessage(NetworkStream stream, ReceiveContext context)
+        private async Task SendEchoMessage(NetworkStream stream, ReceiveContext context)
         {
-            byte[] fullBuffer = new byte[context.sizeBuffer.Length + context.messageLength];
-            Buffer.BlockCopy(context.sizeBuffer, 0, fullBuffer, 0, context.sizeBuffer.Length);
-            Buffer.BlockCopy(context.messageBuffer, 0, fullBuffer, context.sizeBuffer.Length, context.messageLength);
+            if (!context.isConnected)
+            {
+                Log.Print("연결이 끊겨있어 메시지를 송신할 수 없음", LogLevel.WARN);
+                return;
+            }
 
-            Log.Print($"송신: 사이즈 ({PayloadEncoder.SizeBuffer2Num(context.sizeBuffer)}), 메시지 ({PayloadEncoder.GetString(context.messageBuffer, 0, context.messageBuffer.Length)})");
+            byte[] fullBuffer = new byte[context.sizeBuffer.Length + context.expectedMessageLength];
+            Buffer.BlockCopy(context.sizeBuffer, 0, fullBuffer, 0, context.sizeBuffer.Length);
+            Buffer.BlockCopy(context.messageBuffer, 0, fullBuffer, context.sizeBuffer.Length, context.expectedMessageLength);
+
+            Log.Print($"송신: 사이즈 ({PayloadEncoder.SizeBuffer2Num(context.sizeBuffer)}), 메시지 ({PayloadEncoder.GetString(context.messageBuffer, 0, context.expectedMessageLength)})", LogLevel.INFO);
 
             // 비동기 송신
             await stream.WriteAsync(fullBuffer, 0, fullBuffer.Length);
+        }
+
+        private async Task SendMessage(NetworkStream stream, ReceiveContext context, string message)
+        {
+            if (!context.isConnected)
+            {
+                Log.Print("연결이 끊겨있어 메시지를 송신할 수 없음", LogLevel.WARN);
+                return;
+            }
+
+            byte[] messageBuffer = PayloadEncoder.GetBytes(message);
+            int messageBufferLength = messageBuffer.Length;
+
+            byte[] sizeBuffer = PayloadEncoder.Num2SizeBuffer(messageBufferLength);
+            byte[] fullBuffer = new byte[PayloadEncoder.MAX_SIZE_BUFFER_LENGTH + messageBufferLength];
+
+            Buffer.BlockCopy(sizeBuffer, 0, fullBuffer, 0, sizeBuffer.Length);
+            Buffer.BlockCopy(messageBuffer, 0, fullBuffer, sizeBuffer.Length, messageBuffer.Length);
+
+            Log.Print($"송신: 사이즈 ({PayloadEncoder.SizeBuffer2Num(sizeBuffer)}), 메시지 ({PayloadEncoder.GetString(messageBuffer, 0, messageBuffer.Length)})", LogLevel.INFO);
+
+            // 비동기 송신
+            await stream.WriteAsync(fullBuffer, 0, fullBuffer.Length);
+        }
+
+        private async Task ReceiveMessage(NetworkStream stream, ReceiveContext context)
+        {
+            await ReceiveSize(stream, context);
+
+            if (context.expectedMessageLength > PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH)
+            {
+                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.expectedMessageLength}) > MESSAGE_BUFFER_LENGTH({PayloadEncoder.MAX_MESSAGE_BUFFER_LENGTH})", LogLevel.WARN);
+                context.isOverflow = true;
+                await RemoveOverflow(stream, context);
+                return;
+            }
+
+            await ReceiveExpect(stream, context);
+            await SendEchoMessage(stream, context);
         }
 
 
@@ -230,7 +283,6 @@ namespace echo_server
             {
                 while (context.isConnected)
                 {
-                    await ReceiveSize(stream, context);
                     await ReceiveMessage(stream, context);
                 }
 
@@ -238,7 +290,7 @@ namespace echo_server
             }
             catch (Exception ex)
             {
-                Log.Print($"연결 종료\n{ex}");
+                Log.Print($"연결 종료\n{ex}", LogLevel.INFO);
             }
         }
     }
@@ -248,7 +300,7 @@ namespace echo_server
     {
         static Config config = new Config();
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
 #if !DEBUG
             string fileName = "config.json";
@@ -258,165 +310,11 @@ namespace echo_server
             config.PrintLevel = LogLevel.DEBUG;
             config.Port = 7000;
 #endif
-
             Log.PrintLevel = config.PrintLevel;
             Log.PrintHeader();
 
             Server server = new Server();
-            server.Run().Wait();
-
-            ///////////////////////////////
-
-            //AysncEchoServer().Wait();
+            await server.Run();
         }
-
-        async static Task AysncEchoServer()
-        {
-            TcpListener listener = new TcpListener(IPAddress.Any, config.Port);
-            listener.Start();
-            while (true)
-            {
-                // 비동기 Accept                
-                TcpClient tc = await listener.AcceptTcpClientAsync();
-
-                //tc.SendTimeout = 1000;
-                //tc.ReceiveTimeout = 1000;
-
-                // 새 쓰레드에서 처리
-                _ = Task.Run(() =>
-                {
-                    AsyncTcpEcho(tc);
-                });
-            }
-        }
-
-        async static void AsyncTcpEcho(TcpClient tc)
-        {
-            NetworkStream stream = tc.GetStream();
-
-            // 비동기 수신
-            ushort msgBufferLength = 0xFFFF;
-            var msgBuff = new byte[msgBufferLength];
-            string msg = "";
-            int receivedMsgBuffLength = 0;
-
-            int sizeBuffLength = 2;
-            byte[] sizeBuff = new byte[sizeBuffLength];
-            int msgSize = 0;
-            int sizeReceivedBuffLength = 0;
-
-            bool isConnected = true;
-            bool isOverflow = false;
-            int currentReceived = -1;
-
-            try
-            {
-                while (isConnected)
-                {
-                    while (isConnected)
-                    {
-                        currentReceived = await stream.ReadAsync(sizeBuff, sizeReceivedBuffLength, sizeBuffLength - sizeReceivedBuffLength);
-                        sizeReceivedBuffLength += currentReceived;
-                        Log.Print($"sizeReceivedBuffLength: {sizeReceivedBuffLength}");
-
-                        if (currentReceived == 0)
-                        {
-                            Log.Print("0 byte 수신하여 종료");
-                            isConnected = false;
-                            continue;
-                        }
-                        else if (sizeReceivedBuffLength < sizeBuffLength)
-                        {
-                            continue;
-                        }
-                        else if (sizeReceivedBuffLength > sizeBuffLength)
-                        {
-                            Log.Print("메세지 사이즈 버퍼 크기를 초과하여 수신함");
-                            isConnected = false;
-                            continue;
-                        }
-
-                        msgSize = BitConverter.ToInt16(sizeBuff);
-
-                        if (msgSize > msgBufferLength)
-                        {
-                            Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : msgSize({msgSize}) > msgBufferLength({msgBufferLength})");
-                            isOverflow = true;
-                        }
-
-                        break;
-                    }
-
-                    sizeReceivedBuffLength = 0;
-
-                    while (isConnected)
-                    {
-                        if (isOverflow) // 메세지 버퍼 크기 초과하여 수신하려 한 케이스의 입력을 모두 제거
-                        {
-                            currentReceived = await stream.ReadAsync(msgBuff, 0, Math.Min(msgBufferLength, msgSize - receivedMsgBuffLength));
-                            receivedMsgBuffLength += currentReceived;
-
-                            if (currentReceived == 0)
-                            {
-                                isConnected = false;
-                            }
-                            else if (receivedMsgBuffLength == msgSize)
-                            {
-                                isOverflow = false;
-                                break;
-                            }
-
-                            continue;
-                        }
-
-                        currentReceived = await stream.ReadAsync(msgBuff, receivedMsgBuffLength, msgSize - receivedMsgBuffLength);
-
-                        if (currentReceived == 0)
-                        {
-                            Log.Print("0 byte 수신하여 종료");
-                            isConnected = false;
-                            continue;
-                        }
-
-                        receivedMsgBuffLength += currentReceived;
-                        Log.Print($"receivedMsgBuffLength: {receivedMsgBuffLength}");
-
-                        if (receivedMsgBuffLength < msgSize)
-                        {
-                            continue;
-                        }
-                        else if (receivedMsgBuffLength > msgSize)
-                        {
-                            Log.Print("받기로 한 것보다 많은 데이터를 수신함");
-                            isConnected = false;
-                            continue;
-                        }
-
-                        msg = PayloadEncoder.GetString(msgBuff, 0, msgSize);
-
-                        Log.Print($"{msg} at {DateTime.Now}");
-
-                        byte[] fullBuff = new byte[sizeBuff.Length + msgSize];
-                        Buffer.BlockCopy(sizeBuff, 0, fullBuff, 0, sizeBuff.Length);
-                        Buffer.BlockCopy(msgBuff, 0, fullBuff, sizeBuff.Length, msgSize);
-
-                        // 비동기 송신
-                        await stream.WriteAsync(fullBuff, 0, fullBuff.Length);
-
-                        break;
-                    }
-
-                    receivedMsgBuffLength = 0;
-                }
-
-                stream.Close();
-                tc.Close();
-            }
-            catch (Exception ex)
-            {
-                Log.Print($"연결 종료\n{ex}");
-            }
-        }
-
     }
 }
