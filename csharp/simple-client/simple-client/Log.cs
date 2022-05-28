@@ -27,7 +27,7 @@ namespace simple_client
         /// <param name="msg"></param>
         /// <param name="level"></param>
         /// <param name="context"></param>
-        //[Conditional("DEBUG")] NsLog를 여기에 매핑할 거라 함수 살아있어야 함. 그래서 주석처리
+        //[Conditional("DEBUG")]
         public static void Print(string msg, LogLevel level = LogLevel.DEBUG, string context = "")
         {
             if (level <= PrintLevel)

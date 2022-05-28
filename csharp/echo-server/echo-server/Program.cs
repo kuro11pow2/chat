@@ -58,51 +58,60 @@ namespace echo_server
     class ReceiveContext
     {
         public bool isConnected { get; set; }
-        public bool isOverflow { get; set; }
         public int expectedMessageBytesLength { get; set; }
         public byte[] sizeBytes { get; set; }
         public byte[] messageBytes { get; set; }
-        public string fullMessageBytes { get; set; }
+        public string messageStr { get; set; }
 
         public ReceiveContext()
         {
             isConnected = true;
-            isOverflow = false;
             expectedMessageBytesLength = 0;
             sizeBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH];
             messageBytes = new byte[PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH];
-            fullMessageBytes = "";
+            messageStr = "";
+        }
+
+        public override string ToString()
+        {
+            return $"{base.ToString()}\n{nameof(isConnected)}: {isConnected}\n{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
+        }
+
+        private string GetBytes2HexStr(byte[] bytes, int len)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.Append(BitConverter.ToString(bytes[..len]));
+
+            return sb.ToString();
+        }
+    }
+    public class ReceiveOverflowException : Exception
+    {
+        public ReceiveOverflowException()
+        {
+        }
+
+        public ReceiveOverflowException(string message)
+            : base(message)
+        {
+        }
+
+        public ReceiveOverflowException(string message, Exception inner)
+            : base(message, inner)
+        {
         }
     }
 
-    class Server
+    static class TcpClientUtility
     {
-        TcpListener listener;
-
-        public Server()
-        {
-        }
-
-        public async Task Run()
-        {
-            listener = new TcpListener(IPAddress.Any, 7000);
-            listener.Start();
-
-            while (true)
-            {
-                TcpClient tc = await listener.AcceptTcpClientAsync();
-                _ = Proccess(tc);
-            }
-        }
-
-        private void Release(TcpClient tc, NetworkStream stream)
+        public static void Release(TcpClient tc, NetworkStream stream)
         {
             stream.Close();
             tc.Close();
         }
 
-
-        private async Task ReceiveSize(NetworkStream stream, ReceiveContext context)
+        public static async Task ReceiveSize(NetworkStream stream, ReceiveContext context)
         {
             if (!context.isConnected)
             {
@@ -118,7 +127,6 @@ namespace echo_server
 
                 currentReceived = await stream.ReadAsync(context.sizeBytes, receivedSizeBytesLength, PayloadEncoder.MAX_SIZE_BYTES_LENGTH - receivedSizeBytesLength);
                 receivedSizeBytesLength += currentReceived;
-                Log.Print($"sizeReceivedBuffLength: {receivedSizeBytesLength}", LogLevel.INFO);
 
                 if (currentReceived == 0)
                 {
@@ -143,7 +151,7 @@ namespace echo_server
             }
         }
 
-        private async Task RemoveOverflow(NetworkStream stream, ReceiveContext context)
+        public static async Task RemoveOverflow(NetworkStream stream, ReceiveContext context)
         {
             if (!context.isConnected)
             {
@@ -154,7 +162,7 @@ namespace echo_server
             int receivedMessageBytesLength = 0;
             int currentReceived;
 
-            while (context.isOverflow && context.isConnected)
+            while (context.isConnected)
             {
                 int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH, context.expectedMessageBytesLength - receivedMessageBytesLength);
                 currentReceived = await stream.ReadAsync(context.messageBytes, 0, maxReceiveLength);
@@ -169,12 +177,13 @@ namespace echo_server
                 else if (receivedMessageBytesLength == context.expectedMessageBytesLength)
                 {
                     Log.Print("오버플로된 수신 메시지를 모두 소진함", LogLevel.INFO);
-                    context.isOverflow = false;
+                    context.expectedMessageBytesLength = 0;
+                    return;
                 }
             }
         }
 
-        private async Task ReceiveExpect(NetworkStream stream, ReceiveContext context)
+        public static async Task ReceiveExpect(NetworkStream stream, ReceiveContext context)
         {
             if (!context.isConnected)
             {
@@ -188,7 +197,6 @@ namespace echo_server
             {
                 int currentReceived = await stream.ReadAsync(context.messageBytes, receivedMessageBytesLength, context.expectedMessageBytesLength - receivedMessageBytesLength);
                 receivedMessageBytesLength += currentReceived;
-                Log.Print($"receivedMsgBuffLength: {receivedMessageBytesLength}", LogLevel.INFO);
 
                 if (currentReceived == 0)
                 {
@@ -207,15 +215,15 @@ namespace echo_server
                     continue;
                 }
 
-                context.fullMessageBytes = PayloadEncoder.GetString(context.messageBytes, 0, context.expectedMessageBytesLength);
+                context.messageStr = PayloadEncoder.GetString(context.messageBytes, 0, context.expectedMessageBytesLength);
 
-                Log.Print($"{context.fullMessageBytes} at {DateTime.Now}", LogLevel.INFO);
+                Log.Print($"수신: 사이즈 ({PayloadEncoder.Bytes2Num(context.sizeBytes)}), 메시지 ({PayloadEncoder.GetString(context.messageBytes, 0, context.expectedMessageBytesLength)})", LogLevel.INFO);
 
                 break;
             }
         }
 
-        private async Task SendEchoMessage(NetworkStream stream, ReceiveContext context)
+        public static async Task SendEchoMessage(NetworkStream stream, ReceiveContext context)
         {
             if (!context.isConnected)
             {
@@ -233,7 +241,7 @@ namespace echo_server
             await stream.WriteAsync(fullBytes, 0, fullBytes.Length);
         }
 
-        private async Task SendMessage(NetworkStream stream, ReceiveContext context, string message)
+        public static async Task SendMessage(NetworkStream stream, ReceiveContext context, string message)
         {
             if (!context.isConnected)
             {
@@ -256,22 +264,52 @@ namespace echo_server
             await stream.WriteAsync(fullBytes, 0, fullBytes.Length);
         }
 
-        private async Task ReceiveMessage(NetworkStream stream, ReceiveContext context)
+        public static async Task ReceiveMessage(NetworkStream stream, ReceiveContext context)
         {
             await ReceiveSize(stream, context);
 
             if (context.expectedMessageBytesLength > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
             {
                 Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH})", LogLevel.WARN);
-                context.isOverflow = true;
                 await RemoveOverflow(stream, context);
-                return;
+                throw new ReceiveOverflowException();
             }
 
             await ReceiveExpect(stream, context);
-            await SendEchoMessage(stream, context);
         }
 
+        public static string GetMessage()
+        {
+            string msg = Console.ReadLine();
+            byte[] messageBytes = PayloadEncoder.GetBytes(msg);
+
+            if (messageBytes.Length > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
+            {
+                Log.Print($"메시지가 너무 깁니다. {PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH} 이하로 입력하세요.", LogLevel.WARN);
+                return null;
+            }
+
+            return msg;
+        }
+    }
+
+    class Server
+    {
+        public Server()
+        {
+        }
+
+        public async Task Run()
+        {
+            TcpListener listener = new TcpListener(IPAddress.Any, 7000);
+            listener.Start();
+
+            while (true)
+            {
+                TcpClient tc = await listener.AcceptTcpClientAsync();
+                _ = Proccess(tc);
+            }
+        }
 
         private async Task Proccess(TcpClient tc)
         {
@@ -282,10 +320,19 @@ namespace echo_server
             {
                 while (context.isConnected)
                 {
-                    await ReceiveMessage(stream, context);
+                    Log.Print(context.ToString(), LogLevel.DEBUG);
+                    try
+                    {
+                        await TcpClientUtility.ReceiveMessage(stream, context);
+                        await TcpClientUtility.SendEchoMessage(stream, context);
+                    }
+                    catch (ReceiveOverflowException ex)
+                    {
+                        Log.Print($"{ex}", LogLevel.ERROR);
+                    }
                 }
 
-                Release(tc, stream);
+                TcpClientUtility.Release(tc, stream);
             }
             catch (Exception ex)
             {
