@@ -5,6 +5,7 @@ namespace simple_client
 {
     public enum LogLevel
     {
+        OFF,
         ERROR,
         WARN,
         INFO,
