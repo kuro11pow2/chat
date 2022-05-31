@@ -14,7 +14,7 @@ namespace simple_client
 
     public class Log
     {
-        public static LogLevel PrintLevel = LogLevel.INFO;
+        public static LogLevel PrintLevel = LogLevel.DEBUG;
         private const int Width = 3;
         private delegate void OutStream(string obj);
         private static OutStream Out = Console.WriteLine;

@@ -345,11 +345,13 @@ namespace simple_client
     {
         private string ServerAddress;
         private int Port;
+        private int LocalId;
 
-        public Client(string serverAddress, int port)
+        public Client(string serverAddress, int port, int localId=-1)
         {
             ServerAddress = serverAddress;
             Port = port;
+            LocalId = localId;
         }
 
         public async Task Run()
@@ -374,7 +376,7 @@ namespace simple_client
 
             Func<string> getMessage = () =>
             {
-                return context.Cid;
+                return $"{LocalId}";
             };
 
             try
@@ -405,11 +407,11 @@ namespace simple_client
             {
                 while (context.isConnected)
                 {
-                    Log.Print(context.ToString(), LogLevel.DEBUG);
+                    Log.Print($"\n{context}", LogLevel.DEBUG);
                     try
                     {
                         await TcpClientUtility.ReceiveMessage(context);
-                        Log.Print($"received message: {context.ReceiveContext.messageStr}");
+                        Log.Print($"received message: {context.ReceiveContext.messageStr}", LogLevel.INFO);
                     }
                     catch (ReceiveOverflowException ex)
                     {
@@ -446,10 +448,14 @@ namespace simple_client
 
         public Config()
         {
-            //ServerAddress = "localhost";
-            ServerAddress = "192.168.0.53";
             PrintLevel = LogLevel.DEBUG;
+            ServerAddress = "localhost";
             Port = 7000;
+        }
+
+        public override string ToString()
+        {
+            return $"[Config]\n{nameof(PrintLevel)}: {PrintLevel}\n{nameof(ServerAddress)}: {ServerAddress}\n{nameof(Port)}: {Port}";
         }
     }
 
@@ -474,26 +480,35 @@ namespace simple_client
                 await Config2FileHelper.Save(Config);
             }
 #endif
-            Log.PrintLevel = Config.PrintLevel;
-            Log.PrintHeader();
+
 
             /////////////////////////////////////////////////////////
+            //Log.PrintHeader();
+            //Log.Print($"\n{Config}", LogLevel.INFO);
+            //Log.PrintLevel = Config.PrintLevel;
 
             //Client client = new Client(Config.ServerAddress, Config.Port);
             //await client.Run();
 
             /////////////////////////////////////////////////////////
 
-            int runningClientNum = 500;
-            int connectionDelay = 100;
+            int runningClientNum = 1000;
+            int connectionDelay = 50;
             int sendDelay = 1000;
-            Log.PrintLevel = LogLevel.ERROR;
+
+            Config.ServerAddress = "192.168.0.53";
+            Config.Port = 7000;
+            Config.PrintLevel = LogLevel.ERROR;
+
+            Log.PrintHeader();
+            Log.Print($"\n{Config}", LogLevel.INFO);
+            Log.PrintLevel = Config.PrintLevel;
 
             List<Task> tasks = new List<Task>();
 
             for (int i = 0; i < runningClientNum; i++)
             {
-                Client client = new Client(Config.ServerAddress, Config.Port);
+                Client client = new Client(Config.ServerAddress, Config.Port, i);
                 await Task.Delay(connectionDelay);
                 tasks.Add(client.TestRun(sendDelay));
             }

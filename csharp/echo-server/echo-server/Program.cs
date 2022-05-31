@@ -454,9 +454,14 @@ namespace echo_server
 
         public Config()
         {
-            ServerAddress = "localhost";
             PrintLevel = LogLevel.DEBUG;
+            ServerAddress = "localhost";
             Port = 7000;
+        }
+
+        public override string ToString()
+        {
+            return $"[Config]\n{nameof(PrintLevel)}: {PrintLevel}\n{nameof(ServerAddress)}: {ServerAddress}\n{nameof(Port)}: {Port}";
         }
     }
 
@@ -481,8 +486,9 @@ namespace echo_server
                 await Config2FileHelper.Save(Config);
             }
 #endif
-            Log.PrintLevel = Config.PrintLevel;
             Log.PrintHeader();
+            Log.Print($"\n{Config}", LogLevel.INFO);
+            Log.PrintLevel = Config.PrintLevel;
 
             Server server = new Server(Config.Port);
             _ = server.RunMonitor();
