@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Net;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Text.Json;
@@ -33,6 +34,23 @@ namespace simple_client
             using FileStream openStream = File.OpenRead(FilePath);
             T? obj = await JsonSerializer.DeserializeAsync<T>(openStream);
             return obj;
+        }
+    }
+
+    public class PayloadEncoderOverflowException : Exception
+    {
+        public PayloadEncoderOverflowException()
+        {
+        }
+
+        public PayloadEncoderOverflowException(string message)
+            : base(message)
+        {
+        }
+
+        public PayloadEncoderOverflowException(string message, Exception inner)
+            : base(message, inner)
+        {
         }
     }
 
@@ -71,7 +89,10 @@ namespace simple_client
 
         public static byte[] GetBytes(string str)
         {
-            return Encoding.UTF8.GetBytes(str);
+            byte[] tmp = Encoding.UTF8.GetBytes(str);
+            if (tmp.Length > MAX_MESSAGE_BYTES_LENGTH)
+                throw new PayloadEncoderOverflowException($"{MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
+            return tmp;
         }
 
     }
@@ -81,6 +102,7 @@ namespace simple_client
         public int expectedMessageBytesLength { get; set; }
         public byte[] sizeBytes { get; set; }
         public byte[] messageBytes { get; set; }
+        public byte[] fullBytes { get; set; }
         public string messageStr { get; set; }
 
         public ReceiveContext()
@@ -88,6 +110,7 @@ namespace simple_client
             expectedMessageBytesLength = 0;
             sizeBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH];
             messageBytes = new byte[PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH];
+            fullBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH + PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH];
             messageStr = "";
         }
 
@@ -104,7 +127,7 @@ namespace simple_client
 
         public override string ToString()
         {
-            return $"{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
+            return $"{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(fullBytes)}: {GetBytes2HexStr(fullBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH + expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
         }
     }
 
@@ -173,7 +196,7 @@ namespace simple_client
             {
                 int currentReceived;
 
-                currentReceived = await context.Stream.ReadAsync(context.ReceiveContext.sizeBytes, receivedSizeBytesLength, PayloadEncoder.MAX_SIZE_BYTES_LENGTH - receivedSizeBytesLength);
+                currentReceived = await context.Stream.ReadAsync(context.ReceiveContext.sizeBytes, receivedSizeBytesLength, context.ReceiveContext.sizeBytes.Length - receivedSizeBytesLength);
                 receivedSizeBytesLength += currentReceived;
 
                 if (currentReceived == 0)
@@ -182,13 +205,13 @@ namespace simple_client
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedSizeBytesLength > PayloadEncoder.MAX_SIZE_BYTES_LENGTH)
+                else if (receivedSizeBytesLength > context.ReceiveContext.sizeBytes.Length)
                 {
                     Log.Print("받기로 한 것보다 큰 메시지 크기 바이트를 수신함", LogLevel.WARN);
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedSizeBytesLength < PayloadEncoder.MAX_SIZE_BYTES_LENGTH)
+                else if (receivedSizeBytesLength < context.ReceiveContext.sizeBytes.Length)
                 {
                     continue;
                 }
@@ -212,7 +235,7 @@ namespace simple_client
 
             while (context.isConnected)
             {
-                int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH, context.ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
+                int maxReceiveLength = Math.Min(context.ReceiveContext.messageBytes.Length, context.ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
                 currentReceived = await context.Stream.ReadAsync(context.ReceiveContext.messageBytes, 0, maxReceiveLength);
                 receivedMessageBytesLength += currentReceived;
                 Log.Print($"오버플로된 수신 메시지 : {PayloadEncoder.GetString(context.ReceiveContext.messageBytes, 0, maxReceiveLength)}", LogLevel.WARN);
@@ -264,6 +287,8 @@ namespace simple_client
                 }
 
                 context.ReceiveContext.messageStr = PayloadEncoder.GetString(context.ReceiveContext.messageBytes, 0, context.ReceiveContext.expectedMessageBytesLength);
+                Buffer.BlockCopy(context.ReceiveContext.sizeBytes, 0, context.ReceiveContext.fullBytes, 0, context.ReceiveContext.sizeBytes.Length);
+                Buffer.BlockCopy(context.ReceiveContext.messageBytes, 0, context.ReceiveContext.fullBytes, context.ReceiveContext.sizeBytes.Length, context.ReceiveContext.expectedMessageBytesLength);
 
                 Log.Print($"수신: 사이즈 ({PayloadEncoder.Bytes2Num(context.ReceiveContext.sizeBytes)}), 메시지 ({PayloadEncoder.GetString(context.ReceiveContext.messageBytes, 0, context.ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
 
@@ -279,14 +304,10 @@ namespace simple_client
                 return;
             }
 
-            byte[] fullBytes = new byte[src.ReceiveContext.sizeBytes.Length + src.ReceiveContext.expectedMessageBytesLength];
-            Buffer.BlockCopy(src.ReceiveContext.sizeBytes, 0, fullBytes, 0, src.ReceiveContext.sizeBytes.Length);
-            Buffer.BlockCopy(src.ReceiveContext.messageBytes, 0, fullBytes, src.ReceiveContext.sizeBytes.Length, src.ReceiveContext.expectedMessageBytesLength);
-
-            Log.Print($"송신: 사이즈 ({PayloadEncoder.Bytes2Num(src.ReceiveContext.sizeBytes)}), 메시지 ({PayloadEncoder.GetString(src.ReceiveContext.messageBytes, 0, src.ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
+            Log.Print($"송신: 사이즈 ({src.ReceiveContext.expectedMessageBytesLength}), 메시지 ({PayloadEncoder.GetString(src.ReceiveContext.messageBytes, 0, src.ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
 
             // 비동기 송신
-            await dst.Stream.WriteAsync(fullBytes, 0, fullBytes.Length);
+            await dst.Stream.WriteAsync(src.ReceiveContext.fullBytes, 0, src.ReceiveContext.sizeBytes.Length + src.ReceiveContext.expectedMessageBytesLength);
         }
 
         public static async Task SendMessage(ConnectionContext dst, string message)
@@ -301,7 +322,7 @@ namespace simple_client
             int messageBytesLength = messageBytes.Length;
 
             byte[] sizeBytes = PayloadEncoder.Num2SizeBytes(messageBytesLength);
-            byte[] fullBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH + messageBytesLength];
+            byte[] fullBytes = new byte[sizeBytes.Length + messageBytesLength];
 
             Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
             Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
@@ -316,9 +337,9 @@ namespace simple_client
         {
             await ReceiveSize(context);
 
-            if (context.ReceiveContext.expectedMessageBytesLength > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
+            if (context.ReceiveContext.expectedMessageBytesLength > context.ReceiveContext.messageBytes.Length)
             {
-                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.ReceiveContext.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH})", LogLevel.WARN);
+                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.ReceiveContext.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({context.ReceiveContext.messageBytes.Length})", LogLevel.WARN);
                 await RemoveOverflow(context);
                 throw new ReceiveOverflowException();
             }
@@ -329,11 +350,14 @@ namespace simple_client
         public static string GetMessage()
         {
             string msg = Console.ReadLine();
-            byte[] messageBytes = PayloadEncoder.GetBytes(msg);
 
-            if (messageBytes.Length > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
+            try
             {
-                Log.Print($"메시지가 너무 깁니다. {PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH} 이하로 입력하세요.", LogLevel.WARN);
+                byte[] messageBytes = PayloadEncoder.GetBytes(msg);
+            }
+            catch (PayloadEncoderOverflowException ex)
+            {
+                Log.Print($"{ex}", LogLevel.WARN);
                 return null;
             }
 
@@ -360,15 +384,37 @@ namespace simple_client
             NetworkStream stream = tc.GetStream();
             ConnectionContext context = new ConnectionContext(tc, stream, $"{tc.Client.RemoteEndPoint}-{tc.Client.LocalEndPoint}");
 
-            await Proccess(context, TcpClientUtility.GetMessage, 1000);
+            Log.Print($"{context.Cid} 연결 수립", LogLevel.OFF);
 
-            context.Release();
-            Log.Print($"연결 종료", LogLevel.INFO);
+            try
+            { 
+                await Proccess(context, TcpClientUtility.GetMessage, 1000);
+            }
+            catch (Exception ex)
+            {
+                Log.Print($"\n{ex}", LogLevel.ERROR);
+            }
+
+            Log.Print($"{context.Cid} 연결 종료", LogLevel.INFO);
+
+            try
+            {
+                context.Release();
+            }
+            catch (Exception ex)
+            {
+                Log.Print($"{context.Cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
+                return;
+            }
+            Log.Print($"{context.Cid} connection 리소스 해제 완료", LogLevel.INFO);
         }
 
         public async Task TestRun(int sendDelay)
         {
-            TcpClient tc = new TcpClient(ServerAddress, Port);
+            TcpClient tc = await Task.Run(() =>
+            {
+                return new TcpClient(ServerAddress, Port);
+            });
             NetworkStream stream = tc.GetStream();
             ConnectionContext context = new ConnectionContext(tc, stream, $"{tc.Client.RemoteEndPoint}-{tc.Client.LocalEndPoint}");
 
@@ -397,6 +443,7 @@ namespace simple_client
             catch (Exception ex)
             {
                 Log.Print($"{context.Cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
+                return;
             }
             Log.Print($"{context.Cid} connection 리소스 해제 완료", LogLevel.INFO);
         }
@@ -424,7 +471,7 @@ namespace simple_client
             {
                 await Task.Delay(sendDelay);
                 string message = getMessage();
-                if (message == null)
+                if (string.IsNullOrEmpty(message))
                     continue;
                 try
                 {
@@ -435,6 +482,23 @@ namespace simple_client
                     Log.Print($"{ex}", LogLevel.ERROR);
                 }
             }
+        }
+    }
+
+    class ThreadPoolUtility
+    {
+        public static void SetThreadCount(int worker, int completionPort)
+        {
+            ThreadPool.SetMinThreads(worker, completionPort);
+        }
+        public static string GetThreadPoolInfo()
+        {
+            int max_worker, min_worker, avail_worker;
+            int max_completion_port, min_completion_port, avail_completion_port;
+            ThreadPool.GetMaxThreads(out max_worker, out max_completion_port);
+            ThreadPool.GetMinThreads(out min_worker, out min_completion_port);
+            ThreadPool.GetAvailableThreads(out avail_worker, out avail_completion_port);
+            return $"[{nameof(GetThreadPoolInfo)}]\n{nameof(max_worker)}: {max_worker}\n{nameof(min_worker)}: {min_worker}\n{nameof(avail_worker)}: {avail_worker}\n{nameof(max_completion_port)}: {max_completion_port}\n{nameof(min_completion_port)}: {min_completion_port}\n{nameof(avail_completion_port)}: {avail_completion_port}";
         }
     }
 
@@ -484,7 +548,7 @@ namespace simple_client
 
             /////////////////////////////////////////////////////////
             //Log.PrintHeader();
-            //Log.Print($"\n{Config}", LogLevel.INFO);
+            //Log.Print($"\n{Config}", LogLevel.OFF);
             //Log.PrintLevel = Config.PrintLevel;
 
             //Client client = new Client(Config.ServerAddress, Config.Port);
@@ -492,16 +556,18 @@ namespace simple_client
 
             /////////////////////////////////////////////////////////
 
-            int runningClientNum = 1000;
+            int runningClientNum = 100;
             int connectionDelay = 50;
             int sendDelay = 1000;
 
-            Config.ServerAddress = "192.168.0.53";
+            //Config.ServerAddress = "192.168.0.53";
             Config.Port = 7000;
-            Config.PrintLevel = LogLevel.ERROR;
+            Config.PrintLevel = LogLevel.WARN;
+
 
             Log.PrintHeader();
-            Log.Print($"\n{Config}", LogLevel.INFO);
+            Log.Print($"\n{Config}", LogLevel.OFF);
+            Log.Print($"\n{ThreadPoolUtility.GetThreadPoolInfo()}", LogLevel.OFF);
             Log.PrintLevel = Config.PrintLevel;
 
             List<Task> tasks = new List<Task>();
@@ -512,7 +578,6 @@ namespace simple_client
                 await Task.Delay(connectionDelay);
                 tasks.Add(client.TestRun(sendDelay));
             }
-
 
             await Task.WhenAll(tasks);
 

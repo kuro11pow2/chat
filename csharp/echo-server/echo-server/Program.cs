@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -34,6 +35,23 @@ namespace echo_server
             using FileStream openStream = File.OpenRead(FilePath);
             T? obj = await JsonSerializer.DeserializeAsync<T>(openStream);
             return obj;
+        }
+    }
+
+    public class PayloadEncoderOverflowException : Exception
+    {
+        public PayloadEncoderOverflowException()
+        {
+        }
+
+        public PayloadEncoderOverflowException(string message)
+            : base(message)
+        {
+        }
+
+        public PayloadEncoderOverflowException(string message, Exception inner)
+            : base(message, inner)
+        {
         }
     }
 
@@ -72,7 +90,10 @@ namespace echo_server
 
         public static byte[] GetBytes(string str)
         {
-            return Encoding.UTF8.GetBytes(str);
+            byte[] tmp = Encoding.UTF8.GetBytes(str);
+            if (tmp.Length > MAX_MESSAGE_BYTES_LENGTH)
+                throw new PayloadEncoderOverflowException($"{MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
+            return tmp;
         }
 
     }
@@ -82,6 +103,7 @@ namespace echo_server
         public int expectedMessageBytesLength { get; set; }
         public byte[] sizeBytes { get; set; }
         public byte[] messageBytes { get; set; }
+        public byte[] fullBytes { get; set; }
         public string messageStr { get; set; }
 
         public ReceiveContext()
@@ -89,6 +111,7 @@ namespace echo_server
             expectedMessageBytesLength = 0;
             sizeBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH];
             messageBytes = new byte[PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH];
+            fullBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH + PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH];
             messageStr = "";
         }
 
@@ -105,7 +128,7 @@ namespace echo_server
 
         public override string ToString()
         {
-            return $"{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
+            return $"{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(fullBytes)}: {GetBytes2HexStr(fullBytes, PayloadEncoder.MAX_SIZE_BYTES_LENGTH + expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
         }
     }
 
@@ -174,7 +197,7 @@ namespace echo_server
             {
                 int currentReceived;
 
-                currentReceived = await context.Stream.ReadAsync(context.ReceiveContext.sizeBytes, receivedSizeBytesLength, PayloadEncoder.MAX_SIZE_BYTES_LENGTH - receivedSizeBytesLength);
+                currentReceived = await context.Stream.ReadAsync(context.ReceiveContext.sizeBytes, receivedSizeBytesLength, context.ReceiveContext.sizeBytes.Length - receivedSizeBytesLength);
                 receivedSizeBytesLength += currentReceived;
 
                 if (currentReceived == 0)
@@ -183,13 +206,13 @@ namespace echo_server
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedSizeBytesLength > PayloadEncoder.MAX_SIZE_BYTES_LENGTH)
+                else if (receivedSizeBytesLength > context.ReceiveContext.sizeBytes.Length)
                 {
                     Log.Print("받기로 한 것보다 큰 메시지 크기 바이트를 수신함", LogLevel.WARN);
                     context.isConnected = false;
                     continue;
                 }
-                else if (receivedSizeBytesLength < PayloadEncoder.MAX_SIZE_BYTES_LENGTH)
+                else if (receivedSizeBytesLength < context.ReceiveContext.sizeBytes.Length)
                 {
                     continue;
                 }
@@ -213,7 +236,7 @@ namespace echo_server
 
             while (context.isConnected)
             {
-                int maxReceiveLength = Math.Min(PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH, context.ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
+                int maxReceiveLength = Math.Min(context.ReceiveContext.messageBytes.Length, context.ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
                 currentReceived = await context.Stream.ReadAsync(context.ReceiveContext.messageBytes, 0, maxReceiveLength);
                 receivedMessageBytesLength += currentReceived;
                 Log.Print($"오버플로된 수신 메시지 : {PayloadEncoder.GetString(context.ReceiveContext.messageBytes, 0, maxReceiveLength)}", LogLevel.WARN);
@@ -265,6 +288,8 @@ namespace echo_server
                 }
 
                 context.ReceiveContext.messageStr = PayloadEncoder.GetString(context.ReceiveContext.messageBytes, 0, context.ReceiveContext.expectedMessageBytesLength);
+                Buffer.BlockCopy(context.ReceiveContext.sizeBytes, 0, context.ReceiveContext.fullBytes, 0, context.ReceiveContext.sizeBytes.Length);
+                Buffer.BlockCopy(context.ReceiveContext.messageBytes, 0, context.ReceiveContext.fullBytes, context.ReceiveContext.sizeBytes.Length, context.ReceiveContext.expectedMessageBytesLength);
 
                 Log.Print($"수신: 사이즈 ({PayloadEncoder.Bytes2Num(context.ReceiveContext.sizeBytes)}), 메시지 ({PayloadEncoder.GetString(context.ReceiveContext.messageBytes, 0, context.ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
 
@@ -280,14 +305,10 @@ namespace echo_server
                 return;
             }
 
-            byte[] fullBytes = new byte[src.ReceiveContext.sizeBytes.Length + src.ReceiveContext.expectedMessageBytesLength];
-            Buffer.BlockCopy(src.ReceiveContext.sizeBytes, 0, fullBytes, 0, src.ReceiveContext.sizeBytes.Length);
-            Buffer.BlockCopy(src.ReceiveContext.messageBytes, 0, fullBytes, src.ReceiveContext.sizeBytes.Length, src.ReceiveContext.expectedMessageBytesLength);
-
-            Log.Print($"송신: 사이즈 ({PayloadEncoder.Bytes2Num(src.ReceiveContext.sizeBytes)}), 메시지 ({PayloadEncoder.GetString(src.ReceiveContext.messageBytes, 0, src.ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
+            Log.Print($"송신: 사이즈 ({src.ReceiveContext.expectedMessageBytesLength}), 메시지 ({PayloadEncoder.GetString(src.ReceiveContext.messageBytes, 0, src.ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
 
             // 비동기 송신
-            await dst.Stream.WriteAsync(fullBytes, 0, fullBytes.Length);
+            await dst.Stream.WriteAsync(src.ReceiveContext.fullBytes, 0, src.ReceiveContext.sizeBytes.Length + src.ReceiveContext.expectedMessageBytesLength);
         }
 
         public static async Task SendMessage(ConnectionContext dst, string message)
@@ -302,7 +323,7 @@ namespace echo_server
             int messageBytesLength = messageBytes.Length;
 
             byte[] sizeBytes = PayloadEncoder.Num2SizeBytes(messageBytesLength);
-            byte[] fullBytes = new byte[PayloadEncoder.MAX_SIZE_BYTES_LENGTH + messageBytesLength];
+            byte[] fullBytes = new byte[sizeBytes.Length + messageBytesLength];
 
             Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
             Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
@@ -317,9 +338,9 @@ namespace echo_server
         {
             await ReceiveSize(context);
 
-            if (context.ReceiveContext.expectedMessageBytesLength > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
+            if (context.ReceiveContext.expectedMessageBytesLength > context.ReceiveContext.messageBytes.Length)
             {
-                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.ReceiveContext.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH})", LogLevel.WARN);
+                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({context.ReceiveContext.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({context.ReceiveContext.messageBytes.Length})", LogLevel.WARN);
                 await RemoveOverflow(context);
                 throw new ReceiveOverflowException();
             }
@@ -330,11 +351,14 @@ namespace echo_server
         public static string GetMessage()
         {
             string msg = Console.ReadLine();
-            byte[] messageBytes = PayloadEncoder.GetBytes(msg);
 
-            if (messageBytes.Length > PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH)
+            try
             {
-                Log.Print($"메시지가 너무 깁니다. {PayloadEncoder.MAX_MESSAGE_BYTES_LENGTH} 이하로 입력하세요.", LogLevel.WARN);
+                byte[] messageBytes = PayloadEncoder.GetBytes(msg);
+            }
+            catch (PayloadEncoderOverflowException ex)
+            {
+                Log.Print($"{ex}", LogLevel.WARN);
                 return null;
             }
 
@@ -346,6 +370,9 @@ namespace echo_server
     {
         private int Port;
         private ConcurrentDictionary<string, ConnectionContext> Connections = new ConcurrentDictionary<string, ConnectionContext>();
+
+        private long SendMessageCount, ReceivedMessageCount;
+        private long SendByteSize, ReceivedByteSize;
 
         public Server(int port)
         {
@@ -397,6 +424,7 @@ namespace echo_server
                     catch (Exception ex)
                     {
                         Log.Print($"{retrievedValue.Cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
+                        return;
                     }
                     Log.Print($"{retrievedValue.Cid} connection 리소스 해제 완료", LogLevel.INFO);
                 });
@@ -411,6 +439,9 @@ namespace echo_server
                 try
                 {
                     await TcpClientUtility.ReceiveMessage(context);
+                    Interlocked.Increment(ref ReceivedMessageCount);
+                    Interlocked.Add(ref ReceivedByteSize, context.ReceiveContext.sizeBytes.Length + context.ReceiveContext.expectedMessageBytesLength);
+
                     //await TcpClientUtility.SendEchoMessage(stream, context);
                     _ = SendMessage2All(context);
                 }
@@ -421,9 +452,10 @@ namespace echo_server
             }
         }
 
-        private Task SendMessage2All(ConnectionContext src)
+        private async Task SendMessage2All(ConnectionContext src)
         {
             List<Task> tasks = new List<Task>();
+            long sendCount = Connections.Count;
 
             foreach (var pair in Connections)
             {
@@ -431,7 +463,11 @@ namespace echo_server
                 tasks.Add(TcpClientUtility.SendLastReceivedMessage(src, dst));
             }
 
-            return Task.WhenAll(tasks);
+            await Task.WhenAll(tasks);
+            Interlocked.Add(ref SendMessageCount, sendCount);
+            Interlocked.Add(ref SendByteSize, sendCount * (src.ReceiveContext.sizeBytes.Length + src.ReceiveContext.expectedMessageBytesLength));
+
+            return;
         }
 
         public async Task RunMonitor()
@@ -439,8 +475,25 @@ namespace echo_server
             while (true)
             {
                 await Task.Delay(5000);
-                Log.Print($"Connections.Count: {Connections.Count}", LogLevel.OFF, "server monitor");
+                Log.Print($"\nConnections.Count: {Connections.Count}\n{nameof(SendMessageCount)}: {SendMessageCount}\n{nameof(ReceivedMessageCount)}: {ReceivedMessageCount}\n{nameof(SendByteSize)}: {SendByteSize}\n{nameof(ReceivedByteSize)}: {ReceivedByteSize}", LogLevel.OFF, "server monitor");
             }
+        }
+    }
+
+    class ThreadPoolUtility
+    {
+        public static void SetThreadCount(int worker, int completionPort)
+        {
+            ThreadPool.SetMinThreads(worker, completionPort);
+        }
+        public static string GetThreadPoolInfo()
+        {
+            int max_worker, min_worker, avail_worker;
+            int max_completion_port, min_completion_port, avail_completion_port;
+            ThreadPool.GetMaxThreads(out max_worker, out max_completion_port);
+            ThreadPool.GetMinThreads(out min_worker, out min_completion_port);
+            ThreadPool.GetAvailableThreads(out avail_worker, out avail_completion_port);
+            return $"[{nameof(GetThreadPoolInfo)}]\n{nameof(max_worker)}: {max_worker}\n{nameof(min_worker)}: {min_worker}\n{nameof(avail_worker)}: {avail_worker}\n{nameof(max_completion_port)}: {max_completion_port}\n{nameof(min_completion_port)}: {min_completion_port}\n{nameof(avail_completion_port)}: {avail_completion_port}";
         }
     }
 
@@ -486,6 +539,8 @@ namespace echo_server
                 await Config2FileHelper.Save(Config);
             }
 #endif
+            Config.PrintLevel = LogLevel.WARN;
+
             Log.PrintHeader();
             Log.Print($"\n{Config}", LogLevel.INFO);
             Log.PrintLevel = Config.PrintLevel;
