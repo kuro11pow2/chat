@@ -508,7 +508,7 @@ namespace echo_server
         public Config()
         {
             PrintLevel = LogLevel.DEBUG;
-            ServerAddress = "localhost";
+            ServerAddress = "127.0.0.1";
             Port = 7000;
         }
 

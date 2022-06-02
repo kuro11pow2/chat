@@ -347,7 +347,7 @@ namespace simple_client
             await ReceiveExpect(context);
         }
 
-        public static string GetMessage()
+        public static string GetUserInput()
         {
             string msg = Console.ReadLine();
 
@@ -388,7 +388,7 @@ namespace simple_client
 
             try
             { 
-                await Proccess(context, TcpClientUtility.GetMessage, 1000);
+                await Proccess(context, TcpClientUtility.GetUserInput, 1000);
             }
             catch (Exception ex)
             {
@@ -513,7 +513,7 @@ namespace simple_client
         public Config()
         {
             PrintLevel = LogLevel.DEBUG;
-            ServerAddress = "localhost";
+            ServerAddress = "127.0.0.1";
             Port = 7000;
         }
 
