@@ -499,10 +499,8 @@ namespace echo_server
 
     class Config
     {
-        [JsonInclude]
         public LogLevel PrintLevel { get; set; }
         public string ServerAddress { get; set; }
-        [JsonInclude]
         public int Port { get; set; }
 
         public Config()
