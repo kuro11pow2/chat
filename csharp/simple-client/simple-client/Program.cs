@@ -504,10 +504,8 @@ namespace simple_client
 
     class Config
     {
-        [JsonInclude]
         public LogLevel PrintLevel { get; set; }
         public string ServerAddress { get; set; }
-        [JsonInclude]
         public int Port { get; set; }
 
         public Config()
@@ -547,41 +545,41 @@ namespace simple_client
 
 
             /////////////////////////////////////////////////////////
-            //Log.PrintHeader();
-            //Log.Print($"\n{Config}", LogLevel.OFF);
-            //Log.PrintLevel = Config.PrintLevel;
-
-            //Client client = new Client(Config.ServerAddress, Config.Port);
-            //await client.Run();
+            Log.PrintHeader();
+            Log.Print($"\n{Config}", LogLevel.OFF);
+            Log.PrintLevel = Config.PrintLevel;
+            Config.ServerAddress = "192.168.0.53";
+            Client client = new Client(Config.ServerAddress, Config.Port);
+            await client.Run();
 
             /////////////////////////////////////////////////////////
 
-            int runningClientNum = 100;
-            int connectionDelay = 50;
-            int sendDelay = 1000;
+            //int runningClientNum = 100;
+            //int connectionDelay = 50;
+            //int sendDelay = 1000;
 
-            //Config.ServerAddress = "192.168.0.53";
-            Config.Port = 7000;
-            Config.PrintLevel = LogLevel.WARN;
+            ////Config.ServerAddress = "192.168.0.53";
+            //Config.Port = 7000;
+            //Config.PrintLevel = LogLevel.WARN;
 
 
-            Log.PrintHeader();
-            Log.Print($"\n{Config}", LogLevel.OFF);
-            Log.Print($"\n{ThreadPoolUtility.GetThreadPoolInfo()}", LogLevel.OFF);
-            Log.PrintLevel = Config.PrintLevel;
+            //Log.PrintHeader();
+            //Log.Print($"\n{Config}", LogLevel.OFF);
+            //Log.Print($"\n{ThreadPoolUtility.GetThreadPoolInfo()}", LogLevel.OFF);
+            //Log.PrintLevel = Config.PrintLevel;
 
-            List<Task> tasks = new List<Task>();
+            //List<Task> tasks = new List<Task>();
 
-            for (int i = 0; i < runningClientNum; i++)
-            {
-                Client client = new Client(Config.ServerAddress, Config.Port, i);
-                await Task.Delay(connectionDelay);
-                tasks.Add(client.TestRun(sendDelay));
-            }
+            //for (int i = 0; i < runningClientNum; i++)
+            //{
+            //    Client client = new Client(Config.ServerAddress, Config.Port, i);
+            //    await Task.Delay(connectionDelay);
+            //    tasks.Add(client.TestRun(sendDelay));
+            //}
 
-            await Task.WhenAll(tasks);
+            //await Task.WhenAll(tasks);
 
-            Log.Print("전체 종료", LogLevel.OFF);
+            //Log.Print("전체 종료", LogLevel.OFF);
         }
     }
 }
