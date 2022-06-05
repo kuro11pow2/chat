@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace echo_server
+namespace chat
 {
     public enum LogLevel
     {

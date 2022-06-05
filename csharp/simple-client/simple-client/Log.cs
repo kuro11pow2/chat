@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace simple_client
+namespace chat
 {
     public enum LogLevel
     {
@@ -14,7 +14,7 @@ namespace simple_client
 
     public class Log
     {
-        public static LogLevel PrintLevel = LogLevel.DEBUG;
+        public static LogLevel PrintLevel = LogLevel.INFO;
         private const int Width = 3;
         private delegate void OutStream(string obj);
         private static OutStream Out = Console.WriteLine;
