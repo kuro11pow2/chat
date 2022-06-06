@@ -100,8 +100,6 @@ classDiagram
     ChatClient --> Utf8PayloadEncoder : Dependency
     ChatRoom ..|> IServer : Realization
     ChatRoom ..> IClient : Association
-    ChatRoom --> PayloadProtocol : Dependency
-    ChatRoom --> Utf8PayloadEncoder : Dependency
 ```
 
 # Service Architecture
