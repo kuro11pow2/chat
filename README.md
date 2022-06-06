@@ -69,8 +69,7 @@ classDiagram
     }
 
     class IServer {
-        AcceptedClient()* IClient
-        Accept()* void
+        Accept()* IClient
         Kick(IClient)* void
     }
 
