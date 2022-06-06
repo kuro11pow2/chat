@@ -20,7 +20,10 @@ namespace chat
 
         public async Task Run()
         {
-            TcpClient tc = new TcpClient(ServerAddress, Port);
+            TcpClient tc = await Task.Run(() =>
+            {
+                return new TcpClient(ServerAddress, Port);
+            });
             NetworkStream stream = tc.GetStream();
             ConnectionContext context = new ConnectionContext(tc, stream, $"{tc.Client.RemoteEndPoint}-{tc.Client.LocalEndPoint}");
 
