@@ -54,7 +54,7 @@ namespace Chat
 
     internal class Program
     {
-        static async Task ChatClientTest()
+        static async Task ChatRoomTest()
         {
             Log.Print($"ChatClientTest 테스트 시작");
 
@@ -68,35 +68,46 @@ namespace Chat
                 (@"😂🤣⛴🛬🎁", @"😂🤣⛴🛬🎁"),
             };
 
-            Config Config = new Config();
-            ChatClient client = new ChatClient(Config.ServerAddress, Config.Port);
+            int port = 1234;
+            ChatRoom room = new ChatRoom(port);
+            List<ChatClient> clients = new List<ChatClient>();
+            for (int i = 0; i < 3; i++)
+            {
+                clients.Add(new ChatClient("localhost", port, i));
+            }
 
-            await client.Connect();
+            _ = room.Run();
+            _ = room.RunMonitor();
+
+            foreach (var client in clients)
+            {
+                await client.Connect();
+            }
 
             foreach (var parameter in parameters)
             {
                 var input = parameter.Item1;
                 var expected = parameter.Item2;
 
-                await client.Send(input);
-                var output = await client.Receive();
+                await clients[0].Send(input);
 
-                Debug.Assert(output == expected, $"테스트 실패, input: {input}, output: {output}, expected: {expected}");
+                foreach (var client in clients)
+                {
+                    var output = await client.Receive();
+                    Debug.Assert(output == expected, $"테스트 실패, input: {input}, output: {output}, expected: {expected}");
+                }
             }
 
-
-
             Log.Print($"ChatClientTest 테스트 통과, 테스트케이스 수: {parameters.Count}");
+
+            
         }
 
         static async Task Main(string[] args)
         {
             Log.PrintHeader();
-
-            Config Config = new Config();
-            ChatClient client = new ChatClient(Config.ServerAddress, Config.Port);
-
-            await client.Run();
+            await ChatRoomTest();
+            Console.ReadLine();
         }
     }
 }

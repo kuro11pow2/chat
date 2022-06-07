@@ -8,9 +8,13 @@ namespace Common.Interface
 {
     public interface IClient
     {
-        Task Receive();
+        Task<string> Receive();
         Task Send(string message);
         Task Connect();
         void Disconnect();
+        public bool IsConnected();
+        public string GetInfo();
+        public string GetCid();
+        public int GetReceivedByteSize();
     }
 }

@@ -8,29 +8,56 @@ using System.Net.Sockets;
 using Common;
 using Common.Utility;
 using Common.Interface;
-
+using System.Net;
 
 namespace Chat
 {
     public class ChatClient : IClient
     {
         private static IEncoder Encoder = new Utf8PayloadEncoder();
-        private string ServerAddress;
+        private string DestinationAddress;
         private int Port;
         private int LocalId;
         private int SendDelay;
         private ConnectionContext? ConnectionContext { get; set; }
         private ReceiveContext ReceiveContext { get; set; }
-        public string ReceivedMessage => ReceiveContext.messageStr;
 
 
-        public ChatClient(string serverAddress, int port, int localId = -1, int sendDelay = 0)
+        public ChatClient(string destinationAddress, int port, int localId = -1, int sendDelay = 0, ConnectionContext? connectionContext = null)
         {
-            ServerAddress = serverAddress;
+            DestinationAddress = destinationAddress;
             Port = port;
             LocalId = localId;
             SendDelay = sendDelay;
             ReceiveContext = new ReceiveContext();
+            ConnectionContext = connectionContext;
+        }
+
+        public ChatClient(TcpClient client, IPEndPoint endpoint, int localId = -1, int sendDelay = 0) : this(
+            endpoint.Address.ToString(), endpoint.Port, localId, sendDelay,
+            new ConnectionContext(client, client.GetStream(), $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}")
+            )
+        {
+        }
+
+        public bool IsConnected()
+        {
+            return ConnectionContext?.IsConnected ?? false;
+        }
+
+        public string GetInfo()
+        {
+            return $"{nameof(LocalId)}: {LocalId}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(ReceiveContext)}: {ReceiveContext}\n{nameof(SendDelay)}: {SendDelay}\n";
+        }
+
+        public string GetCid()
+        {
+            return ConnectionContext?.Cid ?? "";
+        }
+
+        public int GetReceivedByteSize()
+        {
+            return ReceiveContext.sizeBytes.Length + ReceiveContext.expectedMessageBytesLength;
         }
 
 
@@ -102,10 +129,10 @@ namespace Chat
         {
             TcpClient client = await Task.Run(() =>
             {
-                return new TcpClient(ServerAddress, Port);
+                return new TcpClient(DestinationAddress, Port);
             });
             NetworkStream stream = client.GetStream();
-            string cid = $"{client.Client.RemoteEndPoint}-{client.Client.LocalEndPoint}";
+            string cid = $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}";
             ConnectionContext = new ConnectionContext(client, stream, cid);
 
             Log.Print($"{cid} 연결 수립", LogLevel.OFF);
@@ -120,7 +147,7 @@ namespace Chat
             ConnectionContext.Client.Close();
         }
 
-        public async Task Receive()
+        public async Task<string> Receive()
         {
             await ReceiveSize();
 
@@ -132,6 +159,7 @@ namespace Chat
             }
 
             await ReceiveExpect();
+            return ReceiveContext.messageStr;
         }
 
         public async Task Send(string message)
