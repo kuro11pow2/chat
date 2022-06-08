@@ -102,6 +102,43 @@ classDiagram
     ChatRoom ..> IClient : Association
 ```
 
+# Design Pattern
+## MVC
+```mermaid
+flowchart LR
+    C((Controller_input)) --> M((Model_Strings)) --> V((View_output))
+```
+```mermaid
+flowchart LR
+    StdIn --> Strings --> StdOut
+    NetworkIn --> Strings --> NetworkOut
+    FileIn --> Strings --> FileOut
+```
+## Client
+```mermaid
+flowchart LR
+    StdIn --> Strings1[Strings] --> NetworkOut
+    NetworkIn --> Strings2[Strings] --> StdOut
+```
+
+## Server
+```mermaid
+flowchart LR
+    NetworkIn1 --> Strings --> NetworkOut1
+    NetworkIn2 --> Strings --> NetworkOut2
+    NetworkIn3 --> Strings --> NetworkOut3
+    NetworkIn4 --> Strings --> NetworkOut4
+    NetworkIn5 --> Strings --> NetworkOut5
+```
+
+## MVP
+```mermaid
+flowchart LR
+    V((View_IO)) --action--> P((Presenter)) -- control--> M((Model))
+    M --data--> P --update--> V
+```
+* View and Presenter must be bijection
+
 # Service Architecture
 ```mermaid
 flowchart LR
