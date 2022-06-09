@@ -139,7 +139,7 @@ flowchart LR
 ```
 * View and Presenter must be bijection
 
-# Service Architecture
+# Service Architecture V1
 ```mermaid
 flowchart LR
     User1
@@ -179,6 +179,49 @@ flowchart LR
     subgraph Server2
         ChatClient3 --- ChatRoom1.2
     end
+    
+```
+
+# Service Architecture V2
+```mermaid
+flowchart LR
+    User1
+    User2
+    User3
+    
+    User1 --- Controller1
+    User2 --- Controller2
+    User3 --- Controller2
+
+    LoginServer
+    MariaDB
+    
+    subgraph Server1
+        Controller1
+    end
+    subgraph Server2
+        Controller2
+    end
+
+    subgraph ChannelManager
+    end
+
+    Controller1 --- LoginServer
+    Controller2 --- LoginServer
+    LoginServer --- MariaDB
+
+    subgraph Redis pub/sub
+        Channel1
+    end
+
+    Controller1 --- ChannelManager
+    Controller2 --- ChannelManager
+
+    User1 --- Channel1
+    User2 --- Channel1
+    User3 --- Channel1
+
+    
     
 ```
 
