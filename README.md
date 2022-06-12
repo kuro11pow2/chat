@@ -114,6 +114,20 @@ flowchart LR
     NetworkIn --> Strings --> NetworkOut
     FileIn --> Strings --> FileOut
 ```
+```mermaid
+classDiagram
+    class ISubject {
+        +RegisterObserver(IObserver)* void
+        +UnregisterObserver(IObserver)* void
+        +NotifyObservers()* void
+    }
+
+    class IObserver {
+        +Notify(string)* void
+    }
+
+    IObserver <-- ISubject : Dependency
+```
 ## Client
 ```mermaid
 flowchart LR
