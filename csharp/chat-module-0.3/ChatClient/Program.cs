@@ -69,7 +69,7 @@ namespace Chat
             };
 
             Config Config = new Config();
-            ChatClient client = new ChatClient(Config.ServerAddress, Config.Port);
+            Client client = new Client(Config.ServerAddress, Config.Port);
 
             await client.Connect();
 
@@ -94,7 +94,7 @@ namespace Chat
             Log.PrintHeader();
 
             Config Config = new Config();
-            ChatClient client = new ChatClient(Config.ServerAddress, Config.Port);
+            Client client = new Client(Config.ServerAddress, Config.Port);
 
             await client.Run();
         }

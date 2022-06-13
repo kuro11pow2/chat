@@ -13,7 +13,7 @@ using System.Net;
 
 namespace Chat
 {
-    public class ChatRoom : IServer
+    public class Room : IServer
     {
         private int Port;
         private ConcurrentDictionary<string, IClient> Clients = new ConcurrentDictionary<string, IClient>();
@@ -23,7 +23,7 @@ namespace Chat
 
         private TcpListener listener;
 
-        public ChatRoom(int port)
+        public Room(int port)
         {
             Port = port;
             listener = new TcpListener(IPAddress.Any, Port);
@@ -129,7 +129,7 @@ namespace Chat
             TcpClient tmpClient = await listener.AcceptTcpClientAsync();
             if (tmpClient.Client.RemoteEndPoint == null)
                 throw new Exception("수락된 클라이언트의 RemoteEndPoint가 null임");
-            ChatClient client = new ChatClient(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
+            Client client = new Client(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
             return client;
         }
 

@@ -69,11 +69,11 @@ namespace Chat
             };
 
             int port = 1234;
-            ChatRoom room = new ChatRoom(port);
-            List<ChatClient> clients = new List<ChatClient>();
+            Room room = new Room(port);
+            List<Client> clients = new List<Client>();
             for (int i = 0; i < 3; i++)
             {
-                clients.Add(new ChatClient("localhost", port, i));
+                clients.Add(new Client("localhost", port, i));
             }
 
             _ = room.Run();

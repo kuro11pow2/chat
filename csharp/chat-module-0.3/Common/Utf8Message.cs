@@ -11,19 +11,18 @@ namespace Common
 
     public class Utf8Message : IMessage
     {
-        public static IEncoder Encoder = new Utf8PayloadEncoder();
         private string Str = "";
         private ReadOnlyMemory<byte> Bytes;
 
         public void SetString(string str)
         {
             Str = str;
-            Bytes = Encoder.Encode(str);
+            Bytes = Utf8PayloadProtocol.Encode(str);
         }
 
         public void SetBytes(byte[] bytes, int index, int count)
         {
-            Str = Encoder.Decode(bytes, index, count);
+            Str = Utf8PayloadProtocol.Decode(bytes, index, count);
             Bytes = bytes;
         }
 

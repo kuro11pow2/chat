@@ -17,9 +17,9 @@ namespace Common
         public ReceiveContext()
         {
             expectedMessageBytesLength = 0;
-            sizeBytes = new byte[PayloadProtocol.MAX_SIZE_BYTES_LENGTH];
-            messageBytes = new byte[PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
-            fullBytes = new byte[PayloadProtocol.MAX_SIZE_BYTES_LENGTH + PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
+            sizeBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH];
+            messageBytes = new byte[Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
+            fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
             messageStr = "";
         }
 
@@ -36,7 +36,7 @@ namespace Common
 
         public override string ToString()
         {
-            return $" [{nameof(ReceiveContext)}]\n{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, PayloadProtocol.MAX_SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(fullBytes)}: {GetBytes2HexStr(fullBytes, PayloadProtocol.MAX_SIZE_BYTES_LENGTH + expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
+            return $" [{nameof(ReceiveContext)}]\n{nameof(expectedMessageBytesLength)}: {expectedMessageBytesLength}\n{nameof(sizeBytes)}: {GetBytes2HexStr(sizeBytes, Utf8PayloadProtocol.SIZE_BYTES_LENGTH)}\n{nameof(messageBytes)}: {GetBytes2HexStr(messageBytes, expectedMessageBytesLength)}\n{nameof(fullBytes)}: {GetBytes2HexStr(fullBytes, Utf8PayloadProtocol.SIZE_BYTES_LENGTH + expectedMessageBytesLength)}\n{nameof(messageStr)}: {messageStr}";
         }
     }
 }

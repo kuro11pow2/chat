@@ -12,9 +12,8 @@ using System.Net;
 
 namespace Chat
 {
-    public class ChatClient : IClient
+    public class Client : IClient
     {
-        private static IEncoder Encoder = new Utf8PayloadEncoder();
         private string DestinationAddress;
         private int Port;
         private int LocalId;
@@ -23,7 +22,7 @@ namespace Chat
         private ReceiveContext ReceiveContext { get; set; }
 
 
-        public ChatClient(string destinationAddress, int port, int localId = -1, int sendDelay = 0, ConnectionContext? connectionContext = null)
+        public Client(string destinationAddress, int port, int localId = -1, int sendDelay = 0, ConnectionContext? connectionContext = null)
         {
             DestinationAddress = destinationAddress;
             Port = port;
@@ -33,7 +32,7 @@ namespace Chat
             ConnectionContext = connectionContext;
         }
 
-        public ChatClient(TcpClient client, IPEndPoint endpoint, int localId = -1, int sendDelay = 0) : this(
+        public Client(TcpClient client, IPEndPoint endpoint, int localId = -1, int sendDelay = 0) : this(
             endpoint.Address.ToString(), endpoint.Port, localId, sendDelay,
             new ConnectionContext(client, client.GetStream(), $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}")
             )
@@ -170,10 +169,10 @@ namespace Chat
                 return;
             }
 
-            byte[] messageBytes = Encoder.Encode(message);
+            byte[] messageBytes = Utf8PayloadProtocol.Encode(message);
             int messageBytesLength = messageBytes.Length;
 
-            byte[] sizeBytes = PayloadProtocol.EncodeSizeBytes(messageBytesLength);
+            byte[] sizeBytes = Utf8PayloadProtocol.EncodeSizeBytes(messageBytesLength);
             byte[] fullBytes = new byte[sizeBytes.Length + messageBytesLength];
 
             Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
@@ -221,7 +220,7 @@ namespace Chat
                     continue;
                 }
 
-                ReceiveContext.expectedMessageBytesLength = PayloadProtocol.DecodeSizeBytes(ReceiveContext.sizeBytes);
+                ReceiveContext.expectedMessageBytesLength = Utf8PayloadProtocol.DecodeSizeBytes(ReceiveContext.sizeBytes);
                 break;
             }
         }
@@ -242,7 +241,7 @@ namespace Chat
                 int maxReceiveLength = Math.Min(ReceiveContext.messageBytes.Length, ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
                 currentReceived = await ConnectionContext.Stream.ReadAsync(ReceiveContext.messageBytes, 0, maxReceiveLength);
                 receivedMessageBytesLength += currentReceived;
-                Log.Print($"오버플로된 수신 메시지 : {Encoder.Decode(ReceiveContext.messageBytes, 0, maxReceiveLength)}", LogLevel.WARN);
+                Log.Print($"오버플로된 수신 메시지 : {Utf8PayloadProtocol.Decode(ReceiveContext.messageBytes, 0, maxReceiveLength)}", LogLevel.WARN);
 
                 if (currentReceived == 0)
                 {
@@ -290,11 +289,11 @@ namespace Chat
                     continue;
                 }
 
-                ReceiveContext.messageStr = Encoder.Decode(ReceiveContext.messageBytes, 0, ReceiveContext.expectedMessageBytesLength);
+                ReceiveContext.messageStr = Utf8PayloadProtocol.Decode(ReceiveContext.messageBytes, 0, ReceiveContext.expectedMessageBytesLength);
                 Buffer.BlockCopy(ReceiveContext.sizeBytes, 0, ReceiveContext.fullBytes, 0, ReceiveContext.sizeBytes.Length);
                 Buffer.BlockCopy(ReceiveContext.messageBytes, 0, ReceiveContext.fullBytes, ReceiveContext.sizeBytes.Length, ReceiveContext.expectedMessageBytesLength);
 
-                Log.Print($"수신: 사이즈 ({PayloadProtocol.DecodeSizeBytes(ReceiveContext.sizeBytes)}), 메시지 ({Encoder.Decode(ReceiveContext.messageBytes, 0, ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
+                Log.Print($"수신: 사이즈 ({Utf8PayloadProtocol.DecodeSizeBytes(ReceiveContext.sizeBytes)}), 메시지 ({Utf8PayloadProtocol.Decode(ReceiveContext.messageBytes, 0, ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
 
                 break;
             }
