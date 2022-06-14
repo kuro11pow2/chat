@@ -55,12 +55,12 @@ namespace Chat
                             Log.Print($"\n{client.GetInfo()}", LogLevel.DEBUG);
                             try
                             {
-                                string s = await client.Receive();
+                                IMessage message = await client.Receive();
                                 Interlocked.Increment(ref ReceivedMessageCount);
-                                Interlocked.Add(ref ReceivedByteSize, client.GetReceivedByteSize());
+                                Interlocked.Add(ref ReceivedByteSize, message.GetFullBytesLength());
 
                                 //await TcpClientUtility.SendEchoMessage(stream, context);
-                                _ = Broadcast(client, s);
+                                _ = Broadcast(client, message);
                             }
                             catch (ProtocolBufferOverflowException ex)
                             {
@@ -84,7 +84,7 @@ namespace Chat
 
                     try
                     {
-                        tmpClient.Disconnect();
+                        tmpClient?.Disconnect();
                     }
                     catch (Exception ex)
                     {
@@ -96,7 +96,7 @@ namespace Chat
             }
         }
 
-        public async Task Broadcast(IClient src, string message)
+        public async Task Broadcast(IClient src, IMessage message)
         {
             List<Task> tasks = new List<Task>();
             long sendCount = Clients.Count;
@@ -109,7 +109,7 @@ namespace Chat
 
             await Task.WhenAll(tasks);
             Interlocked.Add(ref SendMessageCount, sendCount);
-            Interlocked.Add(ref SendByteSize, sendCount * src.GetReceivedByteSize());
+            Interlocked.Add(ref SendByteSize, sendCount * message.GetFullBytesLength());
 
             return;
         }

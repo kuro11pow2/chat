@@ -36,7 +36,7 @@ namespace Common
         /// </summary>
         public const int MAX_MESSAGE_BYTES_LENGTH = 1 << (8 * SIZE_BYTES_LENGTH) - 1;
 
-        public static byte[] Encode(string str)
+        public static byte[] EncodeMessage(string str)
         {
             byte[] tmp = Encoding.UTF8.GetBytes(str);
             if (tmp.Length > MAX_MESSAGE_BYTES_LENGTH)
@@ -44,11 +44,11 @@ namespace Common
             return Encoding.UTF8.GetBytes(str);
         }
 
-        public static string Decode(byte[] bytes, int index, int count)
+        public static string DecodeMessage(Span<byte> bytes)
         {
             if (bytes.Length > MAX_MESSAGE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"MESSAGE_BYTES {MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
-            return Encoding.UTF8.GetString(bytes, index, count);
+            return Encoding.UTF8.GetString(bytes);
         }
 
         public static byte[] EncodeSizeBytes(int num)
@@ -59,7 +59,7 @@ namespace Common
             return BitConverter.GetBytes(num)[..SIZE_BYTES_LENGTH];
         }
 
-        public static int DecodeSizeBytes(byte[] sizeBytes)
+        public static int DecodeSizeBytes(Span<byte> sizeBytes)
         {
             if (sizeBytes.Length != SIZE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"SIZE_BYTES {SIZE_BYTES_LENGTH} bytes 아님");
@@ -67,10 +67,29 @@ namespace Common
             int ret = 0;
             for (int i = 0; i < sizeBytes.Length; i++)
             {
-                ret <<= 1;
+                ret <<= 8;
                 ret += sizeBytes[sizeBytes.Length - 1 - i];
             }
             return ret;
+        } 
+
+        public static byte[] Encode(string str)
+        {
+            byte[] messageBytes = EncodeMessage(str);
+            int messageBytesLength = messageBytes.Length;
+
+            byte[] sizeBytes = EncodeSizeBytes(messageBytesLength);
+            byte[] fullBytes = new byte[sizeBytes.Length + messageBytesLength];
+
+            Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
+            Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
+
+            return fullBytes;
+        }
+
+        public static string Decode(Span<byte> fullBytes, int fullLength)
+        {
+            return DecodeMessage(fullBytes.Slice(SIZE_BYTES_LENGTH, fullLength - SIZE_BYTES_LENGTH));
         }
     }
 }

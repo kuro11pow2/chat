@@ -12,24 +12,29 @@ namespace Common
     public class Utf8Message : IMessage
     {
         private string Str = "";
-        private ReadOnlyMemory<byte> Bytes;
+        private Memory<byte> FullBytes;
 
         public void SetString(string str)
         {
             Str = str;
-            Bytes = Utf8PayloadProtocol.Encode(str);
+            FullBytes = Utf8PayloadProtocol.Encode(str);
         }
 
-        public void SetBytes(byte[] bytes, int index, int count)
+        public void SetBytes(byte[] fullBytes, int fullLength)
         {
-            Str = Utf8PayloadProtocol.Decode(bytes, index, count);
-            Bytes = bytes;
+            Str = Utf8PayloadProtocol.Decode(fullBytes, fullLength);
+            FullBytes = new Memory<byte>(fullBytes, 0, fullLength);
         }
 
 
-        public ReadOnlySpan<byte> GetBytes()
+        public ReadOnlyMemory<byte> GetFullBytes()
         {
-            return Bytes.Span;
+            return FullBytes;
+        }
+
+        public int GetFullBytesLength()
+        {
+            return FullBytes.Length;
         }
 
         public string GetString() 
@@ -44,7 +49,7 @@ namespace Common
 
         public string GetInfo()
         {
-            return $"Utf8Message: {Str}, Bytes: {Convert.ToHexString(Bytes.Span)}";
+            return $"Utf8Message: {Str}, Bytes: {Convert.ToHexString(FullBytes.ToArray())}, BytesLength: {GetFullBytesLength()}";
         }
     }
 }

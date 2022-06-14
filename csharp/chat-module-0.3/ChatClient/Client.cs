@@ -19,7 +19,6 @@ namespace Chat
         private int LocalId;
         private int SendDelay;
         private ConnectionContext? ConnectionContext { get; set; }
-        private ReceiveContext ReceiveContext { get; set; }
 
 
         public Client(string destinationAddress, int port, int localId = -1, int sendDelay = 0, ConnectionContext? connectionContext = null)
@@ -28,7 +27,6 @@ namespace Chat
             Port = port;
             LocalId = localId;
             SendDelay = sendDelay;
-            ReceiveContext = new ReceiveContext();
             ConnectionContext = connectionContext;
         }
 
@@ -46,17 +44,12 @@ namespace Chat
 
         public string GetInfo()
         {
-            return $"{nameof(LocalId)}: {LocalId}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(ReceiveContext)}: {ReceiveContext}\n{nameof(SendDelay)}: {SendDelay}\n";
+            return $"{nameof(LocalId)}: {LocalId}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n";
         }
 
         public string GetCid()
         {
             return ConnectionContext?.Cid ?? "";
-        }
-
-        public int GetReceivedByteSize()
-        {
-            return ReceiveContext.sizeBytes.Length + ReceiveContext.expectedMessageBytesLength;
         }
 
 
@@ -73,7 +66,7 @@ namespace Chat
                 {
                     while (ConnectionContext.IsConnected)
                     {
-                        Log.Print($"\n{ConnectionContext}\n{ReceiveContext}", LogLevel.DEBUG);
+                        Log.Print($"\n{ConnectionContext}", LogLevel.DEBUG);
                         try
                         {
                             await Receive();
@@ -90,10 +83,13 @@ namespace Chat
                     if (SendDelay > 0)
                         await Task.Delay(SendDelay);
 
-                    string? message = Console.ReadLine();
+                    string? str = Console.ReadLine();
 
-                    if (string.IsNullOrEmpty(message))
+                    if (string.IsNullOrEmpty(str))
                         continue;
+
+                    IMessage message = new Utf8Message();
+                    message.SetString(str);
 
                     try
                     {
@@ -146,22 +142,23 @@ namespace Chat
             ConnectionContext.Client.Close();
         }
 
-        public async Task<string> Receive()
+        public async Task<IMessage> Receive()
         {
-            await ReceiveSize();
+            byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
+            int expectedMessageBytesLength = await ReceiveSize(fullBytes);
 
-            if (ReceiveContext.expectedMessageBytesLength > ReceiveContext.messageBytes.Length)
+            if (expectedMessageBytesLength > Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH)
             {
-                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({ReceiveContext.expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({ReceiveContext.messageBytes.Length})", LogLevel.WARN);
-                await RemoveOverflow();
+                Log.Print($"메시지 버퍼 크기를 초과하여 수신할 수 없음 : expectedMessageLength({expectedMessageBytesLength}) > MESSAGE_BYTES_LENGTH({Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH})", LogLevel.WARN);
+                await RemoveOverflow(fullBytes, expectedMessageBytesLength);
                 throw new ProtocolBufferOverflowException();
             }
 
-            await ReceiveExpect();
-            return ReceiveContext.messageStr;
+            IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength);
+            return message;
         }
 
-        public async Task Send(string message)
+        public async Task Send(IMessage message)
         {
             if (ConnectionContext == null || !ConnectionContext.IsConnected)
             {
@@ -169,29 +166,22 @@ namespace Chat
                 return;
             }
 
-            byte[] messageBytes = Utf8PayloadProtocol.Encode(message);
-            int messageBytesLength = messageBytes.Length;
+            var fullBytes = message.GetFullBytes();
 
-            byte[] sizeBytes = Utf8PayloadProtocol.EncodeSizeBytes(messageBytesLength);
-            byte[] fullBytes = new byte[sizeBytes.Length + messageBytesLength];
-
-            Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
-            Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
-
-            Log.Print($"송신: 사이즈 ({messageBytesLength}), 메시지 ({message})", LogLevel.INFO);
+            Log.Print($"송신: {message.GetInfo()}", LogLevel.INFO);
 
             // 비동기 송신
-            await ConnectionContext.Stream.WriteAsync(fullBytes, 0, fullBytes.Length);
+            await ConnectionContext.Stream.WriteAsync(fullBytes);
         }
 
 
 
-        private async Task ReceiveSize()
+        private async Task<int> ReceiveSize(byte[] fullBytes)
         {
             if (ConnectionContext == null || !ConnectionContext.IsConnected)
             {
                 Log.Print("연결이 끊겨있어 메시지 크기를 수신할 수 없음", LogLevel.WARN);
-                return;
+                return -1;
             }
 
             int receivedSizeBytesLength = 0;
@@ -200,7 +190,7 @@ namespace Chat
             {
                 int currentReceived;
 
-                currentReceived = await ConnectionContext.Stream.ReadAsync(ReceiveContext.sizeBytes, receivedSizeBytesLength, ReceiveContext.sizeBytes.Length - receivedSizeBytesLength);
+                currentReceived = await ConnectionContext.Stream.ReadAsync(fullBytes, receivedSizeBytesLength, Utf8PayloadProtocol.SIZE_BYTES_LENGTH - receivedSizeBytesLength);
                 receivedSizeBytesLength += currentReceived;
 
                 if (currentReceived == 0)
@@ -209,23 +199,24 @@ namespace Chat
                     ConnectionContext.IsConnected = false;
                     continue;
                 }
-                else if (receivedSizeBytesLength > ReceiveContext.sizeBytes.Length)
+                else if (receivedSizeBytesLength > Utf8PayloadProtocol.SIZE_BYTES_LENGTH)
                 {
                     Log.Print("받기로 한 것보다 큰 메시지 크기 바이트를 수신함", LogLevel.WARN);
                     ConnectionContext.IsConnected = false;
                     continue;
                 }
-                else if (receivedSizeBytesLength < ReceiveContext.sizeBytes.Length)
+                else if (receivedSizeBytesLength < Utf8PayloadProtocol.SIZE_BYTES_LENGTH)
                 {
                     continue;
                 }
 
-                ReceiveContext.expectedMessageBytesLength = Utf8PayloadProtocol.DecodeSizeBytes(ReceiveContext.sizeBytes);
                 break;
             }
+
+            return Utf8PayloadProtocol.DecodeSizeBytes(new Span<byte>(fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH));
         }
 
-        private async Task RemoveOverflow()
+        private async Task RemoveOverflow(byte[] fullBytes, int expectedMessageBytesLength)
         {
             if (ConnectionContext == null || !ConnectionContext.IsConnected)
             {
@@ -235,41 +226,44 @@ namespace Chat
 
             int receivedMessageBytesLength = 0;
             int currentReceived;
+            int offset = Utf8PayloadProtocol.SIZE_BYTES_LENGTH;
 
             while (ConnectionContext.IsConnected)
             {
-                int maxReceiveLength = Math.Min(ReceiveContext.messageBytes.Length, ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
-                currentReceived = await ConnectionContext.Stream.ReadAsync(ReceiveContext.messageBytes, 0, maxReceiveLength);
+                int maxReceiveLength = Math.Min(Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH, expectedMessageBytesLength - receivedMessageBytesLength);
+                currentReceived = await ConnectionContext.Stream.ReadAsync(fullBytes, offset, maxReceiveLength);
                 receivedMessageBytesLength += currentReceived;
-                Log.Print($"오버플로된 수신 메시지 : {Utf8PayloadProtocol.Decode(ReceiveContext.messageBytes, 0, maxReceiveLength)}", LogLevel.WARN);
+                Log.Print($"오버플로된 수신 메시지 : {Utf8PayloadProtocol.DecodeMessage(new Span<byte>(fullBytes).Slice(offset, maxReceiveLength))}", LogLevel.WARN);
 
                 if (currentReceived == 0)
                 {
                     Log.Print("0 byte 수신하여 종료", LogLevel.INFO);
                     ConnectionContext.IsConnected = false;
                 }
-                else if (receivedMessageBytesLength == ReceiveContext.expectedMessageBytesLength)
+                else if (receivedMessageBytesLength == expectedMessageBytesLength)
                 {
                     Log.Print("오버플로된 수신 메시지를 모두 소진함", LogLevel.INFO);
-                    ReceiveContext.expectedMessageBytesLength = 0;
                     return;
                 }
             }
         }
 
-        private async Task ReceiveExpect()
+        private async Task<IMessage> ReceiveExpect(byte[] fullBytes, int expectedMessageBytesLength)
         {
+            IMessage message = new Utf8Message();
+
             if (ConnectionContext == null || !ConnectionContext.IsConnected)
             {
                 Log.Print("연결이 끊겨있어 메시지를 수신할 수 없음", LogLevel.WARN);
-                return;
+                return message;
             }
 
             int receivedMessageBytesLength = 0;
+            int offset = Utf8PayloadProtocol.SIZE_BYTES_LENGTH;
 
             while (ConnectionContext.IsConnected)
             {
-                int currentReceived = await ConnectionContext.Stream.ReadAsync(ReceiveContext.messageBytes, receivedMessageBytesLength, ReceiveContext.expectedMessageBytesLength - receivedMessageBytesLength);
+                int currentReceived = await ConnectionContext.Stream.ReadAsync(fullBytes, offset + receivedMessageBytesLength, expectedMessageBytesLength - receivedMessageBytesLength);
                 receivedMessageBytesLength += currentReceived;
 
                 if (currentReceived == 0)
@@ -278,25 +272,26 @@ namespace Chat
                     ConnectionContext.IsConnected = false;
                     continue;
                 }
-                else if (receivedMessageBytesLength > ReceiveContext.expectedMessageBytesLength)
+                else if (receivedMessageBytesLength > expectedMessageBytesLength)
                 {
                     Log.Print("받기로 한 것보다 큰 메시지 바이트를 수신함", LogLevel.WARN);
                     ConnectionContext.IsConnected = false;
                     continue;
                 }
-                else if (receivedMessageBytesLength < ReceiveContext.expectedMessageBytesLength)
+                else if (receivedMessageBytesLength < expectedMessageBytesLength)
                 {
                     continue;
                 }
 
-                ReceiveContext.messageStr = Utf8PayloadProtocol.Decode(ReceiveContext.messageBytes, 0, ReceiveContext.expectedMessageBytesLength);
-                Buffer.BlockCopy(ReceiveContext.sizeBytes, 0, ReceiveContext.fullBytes, 0, ReceiveContext.sizeBytes.Length);
-                Buffer.BlockCopy(ReceiveContext.messageBytes, 0, ReceiveContext.fullBytes, ReceiveContext.sizeBytes.Length, ReceiveContext.expectedMessageBytesLength);
+                message.SetBytes(fullBytes, offset + expectedMessageBytesLength);
 
-                Log.Print($"수신: 사이즈 ({Utf8PayloadProtocol.DecodeSizeBytes(ReceiveContext.sizeBytes)}), 메시지 ({Utf8PayloadProtocol.Decode(ReceiveContext.messageBytes, 0, ReceiveContext.expectedMessageBytesLength)})", LogLevel.INFO);
+
+                Log.Print($"수신: {message.GetInfo()})", LogLevel.INFO);
 
                 break;
             }
+
+            return message;
         }
     }
 }

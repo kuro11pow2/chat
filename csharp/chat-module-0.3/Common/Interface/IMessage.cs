@@ -9,9 +9,10 @@ namespace Common.Interface
     public interface IMessage
     {
         public void SetString(string str);
-        public void SetBytes(byte[] bytes, int index, int count);
+        public void SetBytes(byte[] bytes, int messageLength);
         public string GetString();
-        public ReadOnlySpan<byte> GetBytes();
+        public ReadOnlyMemory<byte> GetFullBytes();
+        public int GetFullBytesLength();
         public string GetInfo();
 
     }
