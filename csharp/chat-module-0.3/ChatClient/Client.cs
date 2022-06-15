@@ -213,7 +213,7 @@ namespace Chat
                 break;
             }
 
-            return Utf8PayloadProtocol.DecodeSizeBytes(new Span<byte>(fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH));
+            return Utf8PayloadProtocol.DecodeSizeBytes(fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH);
         }
 
         private async Task RemoveOverflow(byte[] fullBytes, int expectedMessageBytesLength)
@@ -233,7 +233,7 @@ namespace Chat
                 int maxReceiveLength = Math.Min(Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH, expectedMessageBytesLength - receivedMessageBytesLength);
                 currentReceived = await ConnectionContext.Stream.ReadAsync(fullBytes, offset, maxReceiveLength);
                 receivedMessageBytesLength += currentReceived;
-                Log.Print($"오버플로된 수신 메시지 : {Utf8PayloadProtocol.DecodeMessage(new Span<byte>(fullBytes).Slice(offset, maxReceiveLength))}", LogLevel.WARN);
+                Log.Print($"오버플로된 수신 메시지 : {Utf8PayloadProtocol.DecodeMessage(fullBytes, offset, maxReceiveLength)}", LogLevel.WARN);
 
                 if (currentReceived == 0)
                 {

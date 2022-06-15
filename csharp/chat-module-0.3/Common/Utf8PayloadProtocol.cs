@@ -28,9 +28,9 @@ namespace Common
         /// <summary>
         /// 메시지 크기 버퍼 최대 길이. 4 bytes 이하 (int 제약)
         /// </summary>
-        public const int SIZE_BYTES_LENGTH = 2;
+        public const int SIZE_BYTES_LENGTH = 1;
 
-        public const uint MAX_SIZE_BYTES_MASK = 0xFFFF_0000;
+        public const uint MAX_SIZE_BYTES_MASK = 0xFFFF_FFFF - ((1 << (SIZE_BYTES_LENGTH * 8)) - 1);
         /// <summary>
         /// 메시지 버퍼 최대 길이. 2^(8 * SIZE_BYTES_LENGTH)-1
         /// </summary>
@@ -44,11 +44,11 @@ namespace Common
             return Encoding.UTF8.GetBytes(str);
         }
 
-        public static string DecodeMessage(Span<byte> bytes)
+        public static string DecodeMessage(byte[] bytes, int start, int length)
         {
-            if (bytes.Length > MAX_MESSAGE_BYTES_LENGTH)
+            if (length - start > MAX_MESSAGE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"MESSAGE_BYTES {MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
-            return Encoding.UTF8.GetString(bytes);
+            return Encoding.UTF8.GetString(new Span<byte>(bytes).Slice(start, length));
         }
 
         public static byte[] EncodeSizeBytes(int num)
@@ -59,16 +59,16 @@ namespace Common
             return BitConverter.GetBytes(num)[..SIZE_BYTES_LENGTH];
         }
 
-        public static int DecodeSizeBytes(Span<byte> sizeBytes)
+        public static int DecodeSizeBytes(byte[] sizeBytes, int start, int length)
         {
-            if (sizeBytes.Length != SIZE_BYTES_LENGTH)
+            if (length - start != SIZE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"SIZE_BYTES {SIZE_BYTES_LENGTH} bytes 아님");
 
             int ret = 0;
-            for (int i = 0; i < sizeBytes.Length; i++)
+            for (int i = start + length - 1; i >= start ; i--)
             {
                 ret <<= 8;
-                ret += sizeBytes[sizeBytes.Length - 1 - i];
+                ret += sizeBytes[i];
             }
             return ret;
         } 
@@ -87,9 +87,9 @@ namespace Common
             return fullBytes;
         }
 
-        public static string Decode(Span<byte> fullBytes, int fullLength)
+        public static string Decode(byte[] fullBytes, int messageLength)
         {
-            return DecodeMessage(fullBytes.Slice(SIZE_BYTES_LENGTH, fullLength - SIZE_BYTES_LENGTH));
+            return DecodeMessage(fullBytes, SIZE_BYTES_LENGTH, messageLength - SIZE_BYTES_LENGTH);
         }
     }
 }

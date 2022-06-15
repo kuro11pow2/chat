@@ -63,7 +63,7 @@ namespace Common
             {
                 var input = parameter.Item1;
                 var inputHex = Convert.FromHexString(input);
-                var output = Utf8PayloadProtocol.DecodeMessage(new Span<byte>(inputHex));
+                var output = Utf8PayloadProtocol.DecodeMessage(inputHex, 0, inputHex.Length);
                 var expected = parameter.Item2;
 
                 Debug.Assert(output == expected, $"테스트 실패, input: {input}, output: {output}, expected: {expected}");
@@ -124,7 +124,7 @@ namespace Common
             foreach (var parameter in parameters)
             {
                 var input = StringToByteArray(parameter.Item1);
-                var output = Utf8PayloadProtocol.DecodeSizeBytes(input);
+                var output = Utf8PayloadProtocol.DecodeSizeBytes(input, 0, input.Length);
                 var expected = parameter.Item2;
 
                 Debug.Assert(output == expected, $"테스트 실패, input: {input}, output: {output}, expected: {expected}");

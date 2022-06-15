@@ -20,10 +20,10 @@ namespace Common
             FullBytes = Utf8PayloadProtocol.Encode(str);
         }
 
-        public void SetBytes(byte[] fullBytes, int fullLength)
+        public void SetBytes(byte[] fullBytes, int messageLength)
         {
-            Str = Utf8PayloadProtocol.Decode(fullBytes, fullLength);
-            FullBytes = new Memory<byte>(fullBytes, 0, fullLength);
+            Str = Utf8PayloadProtocol.Decode(fullBytes, messageLength);
+            FullBytes = new Memory<byte>(fullBytes, 0, messageLength);
         }
 
 
