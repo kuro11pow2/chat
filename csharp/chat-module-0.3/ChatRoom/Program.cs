@@ -72,7 +72,7 @@ namespace Chat
             };
 
             int port = 1234;
-            Room room = new Room(port);
+            Room room = new Room("room0", port);
             List<Client> clients = new List<Client>();
             for (int i = 0; i < 3; i++)
             {

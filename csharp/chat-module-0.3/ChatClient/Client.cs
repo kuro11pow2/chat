@@ -20,6 +20,12 @@ namespace Chat
         private int SendDelay;
         private ConnectionContext? ConnectionContext { get; set; }
 
+        public bool IsConnected { get { return ConnectionContext?.IsConnected ?? false; } }
+
+        public string Cid { get { return ConnectionContext?.Cid ?? "NA"; } }
+
+        public string Info { get { return $"{nameof(LocalId)}: {LocalId}\n{nameof(Cid)}: {Cid}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n"; } }
+
 
         public Client(string destinationAddress, int port, int localId = -1, int sendDelay = 0, ConnectionContext? connectionContext = null)
         {
@@ -36,22 +42,6 @@ namespace Chat
             )
         {
         }
-
-        public bool IsConnected()
-        {
-            return ConnectionContext?.IsConnected ?? false;
-        }
-
-        public string GetInfo()
-        {
-            return $"{nameof(LocalId)}: {LocalId}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n";
-        }
-
-        public string GetCid()
-        {
-            return ConnectionContext?.Cid ?? "";
-        }
-
 
         public async Task Run()
         {

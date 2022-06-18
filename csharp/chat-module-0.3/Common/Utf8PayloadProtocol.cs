@@ -28,7 +28,7 @@ namespace Common
         /// <summary>
         /// 메시지 크기 버퍼 최대 길이. 4 bytes 이하 (int 제약)
         /// </summary>
-        public const int SIZE_BYTES_LENGTH = 1;
+        public const int SIZE_BYTES_LENGTH = 2;
 
         public const uint MAX_SIZE_BYTES_MASK = 0xFFFF_FFFF - ((1 << (SIZE_BYTES_LENGTH * 8)) - 1);
         /// <summary>

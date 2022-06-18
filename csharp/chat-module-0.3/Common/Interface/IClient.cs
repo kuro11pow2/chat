@@ -12,8 +12,8 @@ namespace Common.Interface
         Task Send(IMessage message);
         Task Connect();
         void Disconnect();
-        public bool IsConnected();
-        public string GetCid();
-        public string GetInfo();
+        public bool IsConnected { get; }
+        public string Cid { get; }
+        public string Info { get; }
     }
 }

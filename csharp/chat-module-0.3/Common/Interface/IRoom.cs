@@ -6,11 +6,13 @@ using System.Threading.Tasks;
 
 namespace Common.Interface
 {
-    public interface IServer
+    public interface IRoom
     {
         Task<IClient> Accept();
         Task Kick(IClient client);
         Task Broadcast(IClient src, IMessage message);
-        public string GetInfo();
+        public string Rid { get; }
+        public string Info { get; }
+        public int UserCount { get; }
     }
 }

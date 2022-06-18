@@ -13,7 +13,7 @@ using System.Net;
 
 namespace Chat
 {
-    public class Room : IServer
+    public class Room : IRoom
     {
         private int Port;
         private ConcurrentDictionary<string, IClient> Clients = new ConcurrentDictionary<string, IClient>();
@@ -23,8 +23,17 @@ namespace Chat
 
         private TcpListener listener;
 
-        public Room(int port)
+        private string _rid;
+        public string Rid { get { return _rid; } }
+
+        private int _userCount;
+        public int UserCount { get { return _userCount; } }
+
+        public string Info { get { return $"{nameof(Rid)}: {Rid}\n{nameof(Port)}: {Port}\n{ nameof(UserCount)}: {UserCount}\n{nameof(SendMessageCount)}: {SendMessageCount}\n{nameof(ReceivedMessageCount)}: {ReceivedMessageCount}\n{nameof(SendByteSize)}: {SendByteSize}\n{nameof(ReceivedByteSize)}: {ReceivedByteSize}"; } }
+    
+        public Room(string rid, int port)
         {
+            _rid = rid;
             Port = port;
             listener = new TcpListener(IPAddress.Any, Port);
         }
@@ -36,7 +45,7 @@ namespace Chat
             while (true)
             {
                 IClient client = await Accept();
-                string cid = client.GetCid();
+                string cid = client.Cid;
                 if (Clients.ContainsKey(cid))
                 {
                     throw new Exception($"cid 중복: {cid}");
@@ -50,9 +59,9 @@ namespace Chat
                 {
                     try
                     {
-                        while (client.IsConnected())
+                        while (client.IsConnected)
                         {
-                            Log.Print($"\n{client.GetInfo()}", LogLevel.DEBUG);
+                            Log.Print($"\n{client.Info}", LogLevel.DEBUG);
                             try
                             {
                                 IMessage message = await client.Receive();
@@ -75,7 +84,7 @@ namespace Chat
 
                     Log.Print($"연결 종료", LogLevel.INFO);
 
-                    string cid = client.GetCid();
+                    string cid = client.Cid;
 
                     if (!Clients.TryRemove(cid, out IClient? tmpClient))
                     {
@@ -114,16 +123,6 @@ namespace Chat
             return;
         }
 
-        public async Task RunMonitor()
-        {
-            while (true)
-            {
-                await Task.Delay(5000);
-                Log.Print($"\nConnections.Count: {Clients.Count}\n{nameof(SendMessageCount)}: {SendMessageCount}\n{nameof(ReceivedMessageCount)}: {ReceivedMessageCount}\n{nameof(SendByteSize)}: {SendByteSize}\n{nameof(ReceivedByteSize)}: {ReceivedByteSize}", LogLevel.OFF, "server monitor");
-            }
-        }
-
-
         public async Task<IClient> Accept()
         {
             TcpClient tmpClient = await listener.AcceptTcpClientAsync();
@@ -133,14 +132,18 @@ namespace Chat
             return client;
         }
 
-        public string GetInfo()
+        public Task Kick(IClient client)
         {
             throw new NotImplementedException();
         }
 
-        public Task Kick(IClient client)
+        public async Task RunMonitor()
         {
-            throw new NotImplementedException();
+            while (true)
+            {
+                await Task.Delay(5000);
+                Log.Print($"\n{Info}", LogLevel.OFF, "server monitor");
+            }
         }
     }
 }
