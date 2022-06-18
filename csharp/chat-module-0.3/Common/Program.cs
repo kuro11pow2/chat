@@ -153,7 +153,7 @@ namespace Common
                 var expected = parameter.Item2;
 
                 Utf8Message message = new Utf8Message();
-                message.SetString(input);
+                message.SetMessage(input);
                 var output = message.ToString();
                 Debug.Assert(output == expected, $"테스트 실패, input: {input}, output: {output}, expected: {expected}");
             }

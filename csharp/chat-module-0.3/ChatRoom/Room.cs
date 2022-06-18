@@ -55,6 +55,8 @@ namespace Chat
                     throw new Exception($"connection 등록 실패: {cid}");
                 }
 
+                Interlocked.Increment(ref _userCount);
+
                 _ = Task.Run(async () =>
                 {
                     try
@@ -98,11 +100,20 @@ namespace Chat
                     catch (Exception ex)
                     {
                         Log.Print($"{cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
-                        return;
                     }
                     Log.Print($"{cid} connection 리소스 해제 완료", LogLevel.INFO);
+
+                    Interlocked.Decrement(ref _userCount);
                 });
             }
+        }
+        public async Task<IClient> Accept()
+        {
+            TcpClient tmpClient = await listener.AcceptTcpClientAsync();
+            if (tmpClient.Client.RemoteEndPoint == null)
+                throw new Exception("수락된 클라이언트의 RemoteEndPoint가 null임");
+            Client client = new Client(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
+            return client;
         }
 
         public async Task Broadcast(IClient src, IMessage message)
@@ -121,15 +132,6 @@ namespace Chat
             Interlocked.Add(ref SendByteSize, sendCount * message.GetFullBytesLength());
 
             return;
-        }
-
-        public async Task<IClient> Accept()
-        {
-            TcpClient tmpClient = await listener.AcceptTcpClientAsync();
-            if (tmpClient.Client.RemoteEndPoint == null)
-                throw new Exception("수락된 클라이언트의 RemoteEndPoint가 null임");
-            Client client = new Client(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
-            return client;
         }
 
         public Task Kick(IClient client)

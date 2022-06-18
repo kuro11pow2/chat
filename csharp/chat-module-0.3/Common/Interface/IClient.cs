@@ -8,8 +8,8 @@ namespace Common.Interface
 {
     public interface IClient
     {
-        Task<IMessage> Receive();
         Task Send(IMessage message);
+        Task<IMessage> Receive();
         Task Connect();
         void Disconnect();
         public bool IsConnected { get; }

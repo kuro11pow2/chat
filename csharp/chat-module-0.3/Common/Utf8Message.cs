@@ -14,7 +14,7 @@ namespace Common
         private string Str = "";
         private Memory<byte> FullBytes;
 
-        public void SetString(string str)
+        public void SetMessage(string str)
         {
             Str = str;
             FullBytes = Utf8PayloadProtocol.Encode(str);
@@ -37,14 +37,14 @@ namespace Common
             return FullBytes.Length;
         }
 
-        public string GetString() 
+        public string GetMessage() 
         {
             return Str;
         }
 
         public override string ToString()
         {
-            return GetString();
+            return GetMessage();
         }
 
         public string GetInfo()
