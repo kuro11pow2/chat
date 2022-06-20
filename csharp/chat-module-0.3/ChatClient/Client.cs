@@ -18,16 +18,16 @@ namespace Chat
         private int Port;
         private int LocalId;
         private int SendDelay;
-        private ConnectionContext? ConnectionContext { get; set; }
+        private IConnectionContext? ConnectionContext { get; set; }
 
         public bool IsConnected { get { return ConnectionContext?.IsConnected ?? false; } }
 
-        public string Cid { get { return ConnectionContext?.Cid ?? "NA"; } }
+        public string Cid { get { return ConnectionContext?.ConnectionId ?? "NA"; } }
 
         public string Info { get { return $"{nameof(LocalId)}: {LocalId}\n{nameof(Cid)}: {Cid}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n"; } }
 
 
-        public Client(string destinationAddress, int port, int localId = -1, int sendDelay = 0, ConnectionContext? connectionContext = null)
+        public Client(string destinationAddress, int port, int localId = -1, int sendDelay = 0, IConnectionContext? connectionContext = null)
         {
             DestinationAddress = destinationAddress;
             Port = port;
@@ -96,7 +96,7 @@ namespace Chat
                 Log.Print($"\n{ex}", LogLevel.ERROR);
             }
 
-            Log.Print($"{ConnectionContext.Cid} 연결 종료", LogLevel.INFO);
+            Log.Print($"{Cid} 연결 종료", LogLevel.INFO);
 
             try
             {
@@ -104,10 +104,10 @@ namespace Chat
             }
             catch (Exception ex)
             {
-                Log.Print($"{ConnectionContext.Cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
+                Log.Print($"{Cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
                 return;
             }
-            Log.Print($"{ConnectionContext.Cid} connection 리소스 해제 완료", LogLevel.INFO);
+            Log.Print($"{Cid} connection 리소스 해제 완료", LogLevel.INFO);
         }
 
         public async Task Connect()
@@ -116,7 +116,7 @@ namespace Chat
             {
                 return new TcpClient(DestinationAddress, Port);
             });
-            NetworkStream stream = client.GetStream();
+            var stream = client.GetStream();
             string cid = $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}";
             ConnectionContext = new ConnectionContext(client, stream, cid);
 
@@ -128,8 +128,7 @@ namespace Chat
             if (ConnectionContext == null)
                 throw new Exception("ConnectionContext가 null임");
 
-            ConnectionContext.Stream.Close();
-            ConnectionContext.Client.Close();
+            ConnectionContext.Close();
         }
 
         public async Task Send(IMessage message)
@@ -145,7 +144,7 @@ namespace Chat
             Log.Print($"송신: {message.GetInfo()}", LogLevel.INFO);
 
             // 비동기 송신
-            await ConnectionContext.Stream.WriteAsync(fullBytes);
+            await ConnectionContext.WriteAsync(fullBytes);
         }
 
         public async Task<IMessage> Receive()
@@ -191,7 +190,7 @@ namespace Chat
 
             while (ConnectionContext.IsConnected)
             {
-                int currentReceived = await ConnectionContext.Stream.ReadAsync(fullBytes, offset + receivedMessageBytesLength, count - receivedMessageBytesLength);
+                int currentReceived = await ConnectionContext.ReadAsync(fullBytes, offset + receivedMessageBytesLength, count - receivedMessageBytesLength);
                 receivedMessageBytesLength += currentReceived;
 
                 if (currentReceived == 0)

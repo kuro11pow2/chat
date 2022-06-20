@@ -55,10 +55,8 @@
                                     .Where(x => x % 2 == 0)
                                     .Select(x => Convert.ToByte(input.Substring(x, 2), 16))
                                     .ToArray();
-
             var actual = Utf8PayloadProtocol.DecodeSizeBytes(processedInput, 0, processedInput.Length);
             Assert.Equal(actual, expected);
-
         }
     }
 }
