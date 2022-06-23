@@ -16,7 +16,7 @@ namespace Chat
     public class Room : IRoom
     {
         private int Port;
-        private ConcurrentDictionary<string, IClient> Clients = new ConcurrentDictionary<string, IClient>();
+        private ConcurrentDictionary<string, IClient> Users = new ConcurrentDictionary<string, IClient>();
 
         private long SendMessageCount, ReceivedMessageCount;
         private long SendByteSize, ReceivedByteSize;
@@ -44,13 +44,13 @@ namespace Chat
 
             while (true)
             {
-                IClient client = await Accept();
-                string cid = client.Cid;
-                if (Clients.ContainsKey(cid))
+                IClient user = await Accept();
+                string cid = user.Cid;
+                if (Users.ContainsKey(cid))
                 {
                     throw new Exception($"cid 중복: {cid}");
                 }
-                if (!Clients.TryAdd(cid, client))
+                if (!Users.TryAdd(cid, user))
                 {
                     throw new Exception($"connection 등록 실패: {cid}");
                 }
@@ -61,17 +61,17 @@ namespace Chat
                 {
                     try
                     {
-                        while (client.IsConnected)
+                        while (user.IsConnected)
                         {
-                            Log.Print($"\n{client.Info}", LogLevel.DEBUG);
+                            Log.Print($"\n{user.Info}", LogLevel.DEBUG);
                             try
                             {
-                                IMessage message = await client.Receive();
+                                IMessage message = await user.Receive();
                                 Interlocked.Increment(ref ReceivedMessageCount);
                                 Interlocked.Add(ref ReceivedByteSize, message.GetFullBytesLength());
 
                                 //await TcpClientUtility.SendEchoMessage(stream, context);
-                                _ = Broadcast(client, message);
+                                _ = Broadcast(user, message);
                             }
                             catch (ProtocolBufferOverflowException ex)
                             {
@@ -86,16 +86,16 @@ namespace Chat
 
                     Log.Print($"연결 종료", LogLevel.INFO);
 
-                    string cid = client.Cid;
+                    string cid = user.Cid;
 
-                    if (!Clients.TryRemove(cid, out IClient? tmpClient))
+                    if (!Users.TryRemove(cid, out IClient? tmpUser))
                     {
                         Log.Print($"{cid}를 Connections 에서 제외 실패", LogLevel.ERROR);
                     }
 
                     try
                     {
-                        tmpClient?.Disconnect();
+                        tmpUser?.Disconnect();
                     }
                     catch (Exception ex)
                     {
@@ -112,16 +112,16 @@ namespace Chat
             TcpClient tmpClient = await listener.AcceptTcpClientAsync();
             if (tmpClient.Client.RemoteEndPoint == null)
                 throw new Exception("수락된 클라이언트의 RemoteEndPoint가 null임");
-            Client client = new Client(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
-            return client;
+            User user = new User(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
+            return user;
         }
 
         public async Task Broadcast(IClient src, IMessage message)
         {
             List<Task> tasks = new List<Task>();
-            long sendCount = Clients.Count;
+            long sendCount = Users.Count;
 
-            foreach (var pair in Clients)
+            foreach (var pair in Users)
             {
                 IClient dst = pair.Value;
                 tasks.Add(Task.Run(async () => { await dst.Send(message); }));
@@ -134,7 +134,7 @@ namespace Chat
             return;
         }
 
-        public Task Kick(IClient client)
+        public Task Kick(IClient user)
         {
             throw new NotImplementedException();
         }

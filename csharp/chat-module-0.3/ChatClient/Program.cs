@@ -65,9 +65,9 @@ namespace Chat
 
             Config Config = new Config();
             //Config.ServerAddress = "192.168.0.53";
-            Client client = new Client(Config.ServerAddress, Config.Port);
+            User user = new User(Config.ServerAddress, Config.Port);
 
-            await client.Run();
+            await user.Run();
         }
     }
 }

@@ -10,7 +10,7 @@ namespace Common.Interface
     {
         Task<IClient> Accept();
         Task Broadcast(IClient src, IMessage message);
-        Task Kick(IClient client);
+        Task Kick(IClient user);
         public string Rid { get; }
         public string Info { get; }
         public int UserCount { get; }

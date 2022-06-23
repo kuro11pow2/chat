@@ -13,41 +13,41 @@
         static async Task LocalRoomTest(string input, string expected)
         {
             int port = 1234;
-            int clientCount = 3;
+            int userCount = 3;
 
             Room room = new Room("room0", port);
             _ = room.Run();
             _ = room.RunMonitor();
 
-            List<Client> clients = new List<Client>();
-            for (int i = 0; i < clientCount; i++)
+            List<User> users = new List<User>();
+            for (int i = 0; i < userCount; i++)
             {
-                clients.Add(new Client("127.0.0.1", port, i));
+                users.Add(new User("127.0.0.1", port, i));
             }
 
-            foreach (var client in clients)
+            foreach (var user in users)
             {
-                await client.Connect();
+                await user.Connect();
             }
 
             IMessage message = new Utf8Message();
             message.SetMessage(input);
 
-            for (int i = 0; i < clients.Count; i++)
+            for (int i = 0; i < users.Count; i++)
             {
-                await clients[i].Send(message);
+                await users[i].Send(message);
 
-                foreach (var client in clients)
+                foreach (var user in users)
                 {
-                    var output = await client.Receive();
+                    var output = await user.Receive();
                     var output_message = output.GetMessage();
                     Assert.Equal(expected, output_message);
                 }
             }
 
-            foreach (var client in clients)
+            foreach (var user in users)
             {
-                client.Disconnect();
+                user.Disconnect();
             }
         }
     }

@@ -12,7 +12,7 @@ using System.Net;
 
 namespace Chat
 {
-    public class Client : IClient
+    public class User : IClient
     {
         private string DestinationAddress;
         private int Port;
@@ -27,7 +27,7 @@ namespace Chat
         public string Info { get { return $"{nameof(LocalId)}: {LocalId}\n{nameof(Cid)}: {Cid}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n"; } }
 
 
-        public Client(string destinationAddress, int port, int localId = -1, int sendDelay = 0, IConnectionContext? connectionContext = null)
+        public User(string destinationAddress, int port, int localId = -1, int sendDelay = 0, IConnectionContext? connectionContext = null)
         {
             DestinationAddress = destinationAddress;
             Port = port;
@@ -36,7 +36,7 @@ namespace Chat
             ConnectionContext = connectionContext;
         }
 
-        public Client(TcpClient client, IPEndPoint endpoint, int localId = -1, int sendDelay = 0) : this(
+        public User(TcpClient client, IPEndPoint endpoint, int localId = -1, int sendDelay = 0) : this(
             endpoint.Address.ToString(), endpoint.Port, localId, sendDelay,
             new ConnectionContext(client, client.GetStream(), $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}")
             )
