@@ -3,7 +3,8 @@ name: generate coverage badge
 on:
   push:
     branches: [ main ]
-
+    # paths:
+    #   - "csharp/chat-module-0.3/**"
   workflow_dispatch:
 
 jobs:
@@ -23,44 +24,36 @@ jobs:
       #       ${{ runner.os }}-nuget
       # - name: 의존성 설치
       #   run: dotnet add package Newtonsoft.Json --version 12.0.1
-      
-      - name: 경로 확인
-        run: |
-          cd ./csharp/chat-module-0.3
-          ll
-      
       - uses: actions/checkout@v3
+
       - name: 닷넷 설치 ${{ matrix.dotnet-version }}
         uses: actions/setup-dotnet@v2
         with:
           dotnet-version: ${{ matrix.dotnet-version }}
+          
+
+      - name: 파일 목록
+        run: ls -al
+        working-directory: csharp/chat-module-0.3/Tests
+      
 
       - name: 의존성 설치
-          run: |
-            dotnet restore
-            dotnet add package JunitXml.TestLogger --version 3.0.114
+        run: |
+          dotnet restore
+          dotnet add package JunitXml.TestLogger --version 3.0.114
+        working-directory: csharp/chat-module-0.3/Tests
 
       - name: 닷넷 버전 출력
         run: dotnet --version
           
       - name: 빌드
         run: dotnet build
+        working-directory: csharp/chat-module-0.3/Tests
 
       - name: 테스트 실행
-          run: dotnet test --logger:"junit;LogFilePath=test-result.xml"
-
-      - name: coverage 확인
-        run: |
-          coverage report
-          coverage xml
-          coverage html
-          git status
-
-      - name: 배지 생성
-        run: |
-          genbadge tests
-          genbadge coverage -i - < coverage.xml
-          git status
+        run: dotnet test --logger trx --results-directory "${{ github.workspace }}/csharp/chat-module-0.3/TestResults/TestResults-${{ matrix.dotnet-version }}"
+        working-directory: csharp/chat-module-0.3/Tests
+        
 
       - name: 변경 사항 출력 및 적용
         run: |
@@ -69,7 +62,8 @@ jobs:
           git add .
           git commit -m "변경 사항 적용"
           git status
-          
+        working-directory: csharp/chat-module-0.3
+
       - name: 변경 사항 push
         uses: ad-m/github-push-action@master
         with:

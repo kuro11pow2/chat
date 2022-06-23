@@ -2,7 +2,6 @@
 {
     public class RoomTests
     {
-        [Theory]
         [InlineData(@"0123", @"0123")]
         [InlineData(@"abcxyz", @"abcxyz")]
         [InlineData(@"@!#$%^()[]", @"@!#$%^()[]")]
