@@ -15,7 +15,6 @@ jobs:
         dotnet-version: ['6.x' ]
 
     steps:
-          
       # - uses: actions/cache@v3
       #   with:
       #     path: ~/.nuget/packages
@@ -51,12 +50,21 @@ jobs:
         working-directory: csharp/chat-module-0.3/Tests
 
       - name: 테스트 실행
-        run: dotnet test --logger trx --results-directory "${{ github.workspace }}/csharp/chat-module-0.3/TestResults/TestResults-${{ matrix.dotnet-version }}"
+        run:  |
+          dotnet test --logger:"junit;LogFilePath=${{ github.workspace }}/csharp/chat-module-0.3/test-results/"
+          git status
         working-directory: csharp/chat-module-0.3/Tests
+
+      - name: 테스트 결과 게시
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: "${{ github.workspace }}/csharp/chat-module-0.3/test-results/**/*.xml"
         
 
       - name: 변경 사항 출력 및 적용
         run: |
+          git status
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add .
