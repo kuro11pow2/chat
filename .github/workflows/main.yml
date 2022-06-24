@@ -1,4 +1,4 @@
-name: generate coverage badge
+name: run unit test
 
 on:
   push:
@@ -60,7 +60,7 @@ jobs:
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add .
-          git commit -m "변경 사항 적용"
+          git commit -m "단위테스트 결과 업로드"
           git status
         working-directory: csharp/chat-module-0.3
 

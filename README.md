@@ -1,3 +1,5 @@
+[![run unit test](https://github.com/kuro11pow2/chat/actions/workflows/main.yml/badge.svg)](https://github.com/kuro11pow2/chat/actions/workflows/main.yml)
+
 # Class Diagram V1
 ```mermaid
 classDiagram
