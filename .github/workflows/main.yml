@@ -3,8 +3,8 @@ name: run unit test
 on:
   push:
     branches: [ main ]
-    # paths:
-    #   - "csharp/chat-module-0.3/**"
+    paths:
+      - "csharp/chat-module-0.3/**"
   workflow_dispatch:
 
 jobs:
