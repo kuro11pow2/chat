@@ -89,9 +89,9 @@ namespace Common
             return fullBytes;
         }
 
-        public static string Decode(byte[] fullBytes, int messageLength)
+        public static string Decode(byte[] fullBytes, int bytesLength)
         {
-            return DecodeMessage(fullBytes, SIZE_BYTES_LENGTH, messageLength - SIZE_BYTES_LENGTH);
+            return DecodeMessage(fullBytes, SIZE_BYTES_LENGTH, bytesLength - SIZE_BYTES_LENGTH);
         }
     }
 }

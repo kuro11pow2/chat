@@ -12,7 +12,7 @@ namespace Common.Utility
         DEBUG
     }
 
-    public class Log
+    public static class Log
     {
         public static LogLevel PrintLevel = LogLevel.DEBUG;
         private const int Width = 3;
