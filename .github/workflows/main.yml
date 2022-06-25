@@ -51,7 +51,7 @@ jobs:
 
       - name: 테스트 실행
         run:  |
-          dotnet test --logger:"junit;LogFilePath=${{ github.workspace }}/csharp/chat-module-0.3/test-results/"
+          dotnet test --logger:junit
           git status
         working-directory: csharp/chat-module-0.3/Tests
 
@@ -59,7 +59,7 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v1
         if: always()
         with:
-          files: "${{ github.workspace }}/csharp/chat-module-0.3/test-results/**/*.xml"
+          files: "${{ github.workspace }}/csharp/chat-module-0.3/Tests/TestResults/**/*.xml"
         
 
       - name: 변경 사항 출력 및 적용
