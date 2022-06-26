@@ -5,12 +5,16 @@
         private ReadOnlyMemory<byte> _buffer;
 
         public string ConnectionId { get; }
-        public bool IsConnected { get; set; }
+        public bool IsReady { get; set; }
+
+        string IConnectionContext.RemoteAddress => throw new NotImplementedException();
+
+        int IConnectionContext.Port => throw new NotImplementedException();
 
         public FakeConnectionContext(string connectionId = "", bool isConnected = true)
         {
             ConnectionId = connectionId;
-            IsConnected = isConnected;
+            IsReady = isConnected;
         }
 
         public void Close()
@@ -32,6 +36,11 @@
             _buffer = buffer;
             return ValueTask.CompletedTask;
         }
+
+        Task IConnectionContext.Connect()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class UserTests
@@ -48,7 +57,7 @@
         {
             Config Config = new Config();
             FakeConnectionContext connection = new FakeConnectionContext();
-            User user = new User(Config.ServerAddress, Config.Port, connectionContext: connection);
+            User user = new User(connection);
 
             IMessage message = new Utf8Message();
             message.SetMessage(input);

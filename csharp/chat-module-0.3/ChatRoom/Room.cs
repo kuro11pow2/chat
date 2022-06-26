@@ -61,7 +61,7 @@ namespace Chat
                 {
                     try
                     {
-                        while (user.IsConnected)
+                        while (user.IsReady)
                         {
                             Log.Print($"\n{user.Info}", LogLevel.DEBUG);
                             try
@@ -109,10 +109,9 @@ namespace Chat
         }
         public async Task<IClient> Accept()
         {
-            TcpClient tmpClient = await listener.AcceptTcpClientAsync();
-            if (tmpClient.Client.RemoteEndPoint == null)
-                throw new Exception("수락된 클라이언트의 RemoteEndPoint가 null임");
-            User user = new User(tmpClient, (IPEndPoint)tmpClient.Client.RemoteEndPoint);
+            TcpClient client = await listener.AcceptTcpClientAsync();
+            User user = new User(new ConnectionContext(client));
+            Log.Print($"유저 연결됨\n{user.Info} ", LogLevel.INFO);
             return user;
         }
 

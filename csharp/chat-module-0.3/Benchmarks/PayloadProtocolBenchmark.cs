@@ -10,7 +10,7 @@ namespace Benchmarks
 
     static class StringGenerator
     {
-        public static string GetKoreanString(int length)
+        public static string GetKorean(int length)
         {
             Random random = new Random();
             StringBuilder stringBuilder = new StringBuilder();
@@ -25,7 +25,7 @@ namespace Benchmarks
             return stringBuilder.ToString();
         }
 
-        public static string GetJapaneseString(int length)
+        public static string GetJapanese(int length)
         {
             Random random = new Random();
             StringBuilder stringBuilder = new StringBuilder();
@@ -48,7 +48,7 @@ namespace Benchmarks
         {
             if (length % 3 != 0)
                 throw new InvalidDataException($"UTF8 한글은 글자당 3바이트이므로, 바이트는 3의 배수로 입력되어야 한다. current value : {length}");
-            return Encoding.UTF8.GetBytes(StringGenerator.GetKoreanString(length / 3));
+            return Encoding.UTF8.GetBytes(StringGenerator.GetKorean(length / 3));
         }
 
 
@@ -56,7 +56,7 @@ namespace Benchmarks
         {
             if (length % 3 != 0)
                 throw new InvalidDataException($"UTF8 한자는 글자당 3바이트이므로, 바이트는 3의 배수로 입력되어야 한다. current value : {length}");
-            return Encoding.UTF8.GetBytes(StringGenerator.GetJapaneseString(length / 3));
+            return Encoding.UTF8.GetBytes(StringGenerator.GetJapanese(length / 3));
         }
     }
 
@@ -65,15 +65,15 @@ namespace Benchmarks
     {
         private const int STRING_LENGTH = 10000;
 
-        private readonly string utf8_data;
+        private readonly string data;
 
         public PayloadProtocolEncodeBenchmark()
         {
-            utf8_data = StringGenerator.GetKoreanString(STRING_LENGTH);
+            data = StringGenerator.GetKorean(STRING_LENGTH);
         }
 
         [Benchmark]
-        public byte[] Utf8Encode() => Utf8PayloadProtocol.Encode(utf8_data);
+        public byte[] Utf8Encode() => Utf8PayloadProtocol.Encode(data);
     }
 
     public class PayloadProtocolDecodeBenchmark

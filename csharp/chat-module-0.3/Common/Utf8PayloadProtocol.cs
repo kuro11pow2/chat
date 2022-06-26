@@ -36,26 +36,24 @@ namespace Common
         /// </summary>
         public const int MAX_MESSAGE_BYTES_LENGTH = 1 << (8 * SIZE_BYTES_LENGTH) - 1;
 
-        public static bool LENGTH_CHECK = true;
-
         public static byte[] EncodeMessage(string str)
         {
             byte[] tmp = Encoding.UTF8.GetBytes(str);
-            if (LENGTH_CHECK && tmp.Length > MAX_MESSAGE_BYTES_LENGTH)
+            if (tmp.Length > MAX_MESSAGE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"MESSAGE_BYTES {MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
             return Encoding.UTF8.GetBytes(str);
         }
 
         public static string DecodeMessage(byte[] bytes, int start, int length)
         {
-            if (LENGTH_CHECK && length - start > MAX_MESSAGE_BYTES_LENGTH)
+            if (length - start > MAX_MESSAGE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"MESSAGE_BYTES {MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
             return Encoding.UTF8.GetString(new Span<byte>(bytes).Slice(start, length));
         }
 
         public static byte[] EncodeSizeBytes(int num)
         {
-            if (LENGTH_CHECK && 0 != (num & MAX_SIZE_BYTES_MASK))
+            if (0 != (num & MAX_SIZE_BYTES_MASK))
                 throw new ProtocolBufferOverflowException($"SIZE_BYTES {SIZE_BYTES_LENGTH} bytes 초과");
 
             return BitConverter.GetBytes(num)[..SIZE_BYTES_LENGTH];
@@ -63,7 +61,7 @@ namespace Common
 
         public static int DecodeSizeBytes(byte[] sizeBytes, int start, int length)
         {
-            if (LENGTH_CHECK && length - start != SIZE_BYTES_LENGTH)
+            if (length - start != SIZE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"SIZE_BYTES {SIZE_BYTES_LENGTH} bytes 아님");
 
             int ret = 0;

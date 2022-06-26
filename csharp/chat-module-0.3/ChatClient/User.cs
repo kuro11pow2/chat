@@ -14,32 +14,24 @@ namespace Chat
 {
     public class User : IClient
     {
-        private string DestinationAddress;
-        private int Port;
-        private int LocalId;
-        private int SendDelay;
-        private IConnectionContext? ConnectionContext { get; set; }
+        private int SendDelay { get; set; }
+        private IConnectionContext ConnectionContext { get; set; }
+        private bool MustBeDisconnected { get; set; } = false;
 
-        public bool IsConnected { get { return ConnectionContext?.IsConnected ?? false; } }
+        public bool IsReady { get { return ConnectionContext.IsReady; } }
 
         public string Cid { get { return ConnectionContext?.ConnectionId ?? "NA"; } }
 
-        public string Info { get { return $"{nameof(LocalId)}: {LocalId}\n{nameof(Cid)}: {Cid}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n"; } }
+        public string Info { get { return $"{nameof(Cid)}: {Cid}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n"; } }
 
 
-        public User(string destinationAddress, int port, int localId = -1, int sendDelay = 0, IConnectionContext? connectionContext = null)
+        public User(IConnectionContext connectionContext, int sendDelay = 0)
         {
-            DestinationAddress = destinationAddress;
-            Port = port;
-            LocalId = localId;
-            SendDelay = sendDelay;
             ConnectionContext = connectionContext;
+            SendDelay = sendDelay;
         }
 
-        public User(TcpClient client, IPEndPoint endpoint, int localId = -1, int sendDelay = 0) : this(
-            endpoint.Address.ToString(), endpoint.Port, localId, sendDelay,
-            new ConnectionContext(client, client.GetStream(), $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}")
-            )
+        public User(TcpClient client, int sendDelay = 0) : this(new ConnectionContext(client), sendDelay)
         {
         }
 
@@ -47,53 +39,44 @@ namespace Chat
         {
             await Connect();
 
-            if (ConnectionContext == null)
-                throw new Exception("ConnectionContext == null");
-
-            try
+            _ = Task.Run(async () =>
             {
-                _ = Task.Run(async () =>
+                while (MustBeDisconnected == false)
                 {
-                    while (ConnectionContext.IsConnected)
-                    {
-                        //Log.Print($"\n{ConnectionContext}", LogLevel.DEBUG);
-                        try
-                        {
-                            await Receive();
-                        }
-                        catch (ProtocolBufferOverflowException ex)
-                        {
-                            Log.Print($"{ex}", LogLevel.ERROR);
-                        }
-                    }
-                });
-
-                while (ConnectionContext.IsConnected)
-                {
-                    if (SendDelay > 0)
-                        await Task.Delay(SendDelay);
-
-                    string? str = Console.ReadLine();
-
-                    if (string.IsNullOrEmpty(str))
-                        continue;
-
-                    IMessage message = new Utf8Message();
-                    message.SetMessage(str);
-
                     try
                     {
-                        await Send(message);
+                        await Receive();
                     }
-                    catch (ProtocolBufferOverflowException ex)
+                    catch (Exception ex)
                     {
                         Log.Print($"{ex}", LogLevel.ERROR);
+                        MustBeDisconnected = true;
                     }
                 }
-            }
-            catch (Exception ex)
+            });
+
+            while (MustBeDisconnected == false)
             {
-                Log.Print($"\n{ex}", LogLevel.ERROR);
+                if (SendDelay > 0)
+                    await Task.Delay(SendDelay);
+
+                string? str = Console.ReadLine();
+
+                if (string.IsNullOrEmpty(str))
+                    continue;
+
+                IMessage message = new Utf8Message();
+                message.SetMessage(str);
+
+                try
+                {
+                    await Send(message);
+                }
+                catch (ProtocolBufferOverflowException ex)
+                {
+                    Log.Print($"{ex}", LogLevel.ERROR);
+                    MustBeDisconnected = true;
+                }
             }
 
             Log.Print($"{Cid} 연결 종료", LogLevel.INFO);
@@ -112,33 +95,16 @@ namespace Chat
 
         public async Task Connect()
         {
-            TcpClient client = await Task.Run(() =>
-            {
-                return new TcpClient(DestinationAddress, Port);
-            });
-            var stream = client.GetStream();
-            string cid = $"{client.Client.LocalEndPoint}-{client.Client.RemoteEndPoint}";
-            ConnectionContext = new ConnectionContext(client, stream, cid);
-
-            Log.Print($"{cid} 연결 수립", LogLevel.OFF);
+            await ConnectionContext.Connect();
         }
 
         public void Disconnect()
         {
-            if (ConnectionContext == null)
-                throw new Exception("ConnectionContext가 null임");
-
             ConnectionContext.Close();
         }
 
         public async Task Send(IMessage message)
         {
-            if (ConnectionContext == null || !ConnectionContext.IsConnected)
-            {
-                Log.Print("연결이 끊겨있어 메시지를 송신할 수 없음", LogLevel.WARN);
-                return;
-            }
-
             var fullBytes = message.GetFullBytes();
 
             Log.Print($"송신: {message.GetInfo()}", LogLevel.INFO);
@@ -180,15 +146,9 @@ namespace Chat
 
         private async Task ReadNetworkStream(byte[] fullBytes, int offset, int count)
         {
-            if (ConnectionContext == null || !ConnectionContext.IsConnected)
-            {
-                Log.Print($"연결이 끊겨있음\n{Info}", LogLevel.WARN);
-                return;
-            }
-
             int receivedMessageBytesLength = 0;
 
-            while (ConnectionContext.IsConnected)
+            while (true)
             {
                 int currentReceived = await ConnectionContext.ReadAsync(fullBytes, offset + receivedMessageBytesLength, count - receivedMessageBytesLength);
                 receivedMessageBytesLength += currentReceived;
@@ -197,14 +157,12 @@ namespace Chat
                 {
                     string ex = "0 byte 수신하여 종료";
                     Log.Print(ex, LogLevel.INFO);
-                    ConnectionContext.IsConnected = false;
                     throw new IOException(ex);
                 }
                 if (receivedMessageBytesLength > count)
                 {
                     string ex = "받기로 한 것보다 큰 메시지 바이트를 수신함";
                     Log.Print(ex, LogLevel.WARN);
-                    ConnectionContext.IsConnected = false;
                     throw new ProtocolBufferOverflowException(ex);
                 }
                 if (receivedMessageBytesLength < count)

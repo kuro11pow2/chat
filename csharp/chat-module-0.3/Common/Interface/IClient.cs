@@ -12,7 +12,7 @@ namespace Common.Interface
         Task<IMessage> Receive();
         Task Connect();
         void Disconnect();
-        public bool IsConnected { get; }
+        public bool IsReady { get; }
         public string Cid { get; }
         public string Info { get; }
     }

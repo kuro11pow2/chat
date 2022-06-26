@@ -2,6 +2,9 @@
 {
     public class RoomTests
     {
+#if TEST
+        [Theory]
+#endif
         [InlineData(@"0123", @"0123")]
         [InlineData(@"abcxyz", @"abcxyz")]
         [InlineData(@"@!#$%^()[]", @"@!#$%^()[]")]
@@ -21,7 +24,8 @@
             List<User> users = new List<User>();
             for (int i = 0; i < userCount; i++)
             {
-                users.Add(new User("127.0.0.1", port, i));
+                IConnectionContext context = new ConnectionContext("127.0.0.1", port);
+                users.Add(new User(context));
             }
 
             foreach (var user in users)

@@ -32,11 +32,11 @@ namespace Chat
                 config.ServerAddress = "192.168.0.53";
                 await object2FileHelper.Save(config);
             }
-#elif DEBUG
+#elif DEBUG || TEST
             Config config = new Config();
 #endif
             Log.PrintLevel = config.PrintLevel;
-            User user = new User(config.ServerAddress, config.Port);
+            User user = new User(new ConnectionContext(config.ServerAddress, config.Port));
 
             while (true)
             {

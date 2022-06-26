@@ -35,10 +35,10 @@ namespace Benchmarks
             sum = BenchmarkRunner.Run<PayloadProtocolEncodeBenchmark>();
             //sum = BenchmarkRunner.Run<PayloadProtocolDecodeBenchmark>();
 #elif DEBUG
-            var encode = new Utf8PayloadProtocolEncodeBenchmark();
-            var encode_out = encode.Encode();
-            var decode = new Utf8PayloadProtocolDecodeBenchmark();
-            var decode_out = decode.Decode();
+            var encode = new PayloadProtocolEncodeBenchmark();
+            var encode_out = encode.Utf8Encode();
+            var decode = new PayloadProtocolDecodeBenchmark();
+            var decode_out = decode.Utf8Decode();
 #endif
         }
     }

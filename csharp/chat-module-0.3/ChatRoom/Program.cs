@@ -33,7 +33,7 @@ namespace Chat
                 config = new Config();
                 await object2FileHelper.Save(config);
             }
-#elif DEBUG
+#elif DEBUG || TEST
             Config config = new Config();
 #endif
             Log.PrintLevel = config.PrintLevel;
