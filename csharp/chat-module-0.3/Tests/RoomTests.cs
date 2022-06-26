@@ -2,9 +2,6 @@
 {
     public class RoomTests
     {
-#if TEST
-        [Theory]
-#endif
         [InlineData(@"0123", @"0123")]
         [InlineData(@"abcxyz", @"abcxyz")]
         [InlineData(@"@!#$%^()[]", @"@!#$%^()[]")]
