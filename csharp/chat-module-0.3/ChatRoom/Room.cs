@@ -13,7 +13,7 @@ using System.Net;
 
 namespace Chat
 {
-    public class Room : IRoom
+    public class Room
     {
         private int Port;
         private ConcurrentDictionary<string, IClient> Users = new ConcurrentDictionary<string, IClient>();
@@ -33,6 +33,7 @@ namespace Chat
     
         public Room(string rid, int port)
         {
+            throw new NotSupportedException();
             _rid = rid;
             Port = port;
             listener = new TcpListener(IPAddress.Any, Port);
@@ -59,51 +60,30 @@ namespace Chat
 
                 _ = Task.Run(async () =>
                 {
-                    try
+                    while (user.IsReady)
                     {
-                        while (user.IsReady)
+                        Log.Print($"\n{user.Info}", LogLevel.DEBUG);
+                        try
                         {
-                            Log.Print($"\n{user.Info}", LogLevel.DEBUG);
-                            try
-                            {
-                                IMessage message = await user.Receive();
-                                Interlocked.Increment(ref ReceivedMessageCount);
-                                Interlocked.Add(ref ReceivedByteSize, message.GetFullBytesLength());
+                            IMessage message = await user.Receive();
+                            Interlocked.Increment(ref ReceivedMessageCount);
+                            Interlocked.Add(ref ReceivedByteSize, message.GetFullBytesLength());
 
-                                //await TcpClientUtility.SendEchoMessage(stream, context);
-                                _ = Broadcast(user, message);
-                            }
-                            catch (ProtocolBufferOverflowException ex)
-                            {
-                                Log.Print($"{ex}", LogLevel.ERROR);
-                            }
+                            //await TcpClientUtility.SendEchoMessage(stream, context);
+                            _ = Broadcast(user, message);
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Print($"\n{ex}", LogLevel.ERROR);
+                        catch (Exception ex)
+                        {
+                            Log.Print($"{ex}", LogLevel.ERROR);
+                            break;
+                        }
                     }
 
                     Log.Print($"연결 종료", LogLevel.INFO);
 
                     string cid = user.Cid;
 
-                    if (!Users.TryRemove(cid, out IClient? tmpUser))
-                    {
-                        Log.Print($"{cid}를 Connections 에서 제외 실패", LogLevel.ERROR);
-                    }
-
-                    try
-                    {
-                        tmpUser?.Disconnect();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Print($"{cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
-                    }
-                    Log.Print($"{cid} connection 리소스 해제 완료", LogLevel.INFO);
-
-                    Interlocked.Decrement(ref _userCount);
+                    Kick(cid);
                 });
             }
         }
@@ -123,7 +103,7 @@ namespace Chat
             foreach (var pair in Users)
             {
                 IClient dst = pair.Value;
-                tasks.Add(Task.Run(async () => { await dst.Send(message); }));
+                tasks.Add(dst.Send(message));
             }
 
             await Task.WhenAll(tasks);
@@ -133,7 +113,28 @@ namespace Chat
             return;
         }
 
-        public Task Kick(IClient user)
+        public void Kick(string cid)
+        {
+            if (!Users.TryRemove(cid, out IClient? tmpUser))
+            {
+                Log.Print($"{cid}를 Connections 에서 제외 실패", LogLevel.ERROR);
+            }
+
+            try
+            {
+                tmpUser?.Disconnect();
+            }
+            catch (Exception ex)
+            {
+                Log.Print($"{cid} 리소스 해제 실패\n{ex}", LogLevel.ERROR);
+            }
+
+            Log.Print($"{cid} connection 리소스 해제 완료", LogLevel.INFO);
+
+            Interlocked.Decrement(ref _userCount);
+        }
+
+        public void Close()
         {
             throw new NotImplementedException();
         }
