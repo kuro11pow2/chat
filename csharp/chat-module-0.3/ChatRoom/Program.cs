@@ -37,7 +37,7 @@ namespace Chat
             Config config = new Config();
 #endif
             Log.PrintLevel = config.PrintLevel;
-            Room room = new Room("room0", config.Port);
+            RoomQ room = new RoomQ(config.Port);
 
             _ = room.RunMonitor();
             await room.Run();

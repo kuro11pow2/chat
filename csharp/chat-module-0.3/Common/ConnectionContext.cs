@@ -98,7 +98,6 @@ namespace Common
             return Stream.ReadAsync(buffer, offset, count);
         }
 
-
         public override string ToString()
         {
             return $" [{nameof(ConnectionContext)}]\n{nameof(ConnectionId)}: {ConnectionId}\n{nameof(IsReady)}: {IsReady}";

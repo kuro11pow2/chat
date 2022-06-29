@@ -40,8 +40,15 @@ namespace Chat
 
             while (true)
             {
-                await user.Run();
-                await Task.Delay(5000);
+                try
+                {
+                    await user.Run();
+                }
+                catch 
+                {
+                    Log.Print($"서버 연결 시도중\n{user.Info}", LogLevel.ERROR);
+                }
+                await Task.Delay(1000);
             }
         }
     }
