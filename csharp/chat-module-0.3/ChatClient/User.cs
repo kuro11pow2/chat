@@ -22,7 +22,7 @@ namespace Chat
 
         public string Cid { get { return ConnectionContext?.ConnectionId ?? "NA"; } }
 
-        public string Info { get { return $"{nameof(Cid)}: {Cid}\n{nameof(ConnectionContext)}: {ConnectionContext}\n{nameof(SendDelay)}: {SendDelay}\n"; } }
+        public string Info { get { return $"{nameof(Cid)}: {Cid}\n{nameof(SendDelay)}: {SendDelay}\n{ConnectionContext}"; } }
 
 
         public User(IConnectionContext connectionContext, int sendDelay = 0)
@@ -60,7 +60,17 @@ namespace Chat
                 if (SendDelay > 0)
                     await Task.Delay(SendDelay);
 
-                string? str = Console.ReadLine();
+                string? str = "";
+                var userInputRead = Task.Run(() => Console.ReadLine());
+                int connectionCheckDelay = 2000;
+
+                CancellationTokenSource cts = new CancellationTokenSource();
+                cts.CancelAfter(connectionCheckDelay);
+                
+                if (await Task.WhenAny(userInputRead, Task.Delay(-1, cts.Token)) != userInputRead)
+                    continue;
+
+                str = userInputRead.Result;
 
                 if (string.IsNullOrEmpty(str))
                     continue;
