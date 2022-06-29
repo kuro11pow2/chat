@@ -100,7 +100,7 @@ namespace Common
 
         public override string ToString()
         {
-            return $" [{nameof(ConnectionContext)}]\n{nameof(ConnectionId)}: {ConnectionId}\n{nameof(IsReady)}: {IsReady}";
+            return $" [{nameof(ConnectionContext)}]\n{nameof(ConnectionId)}: {ConnectionId}\n{nameof(IsReady)}: {IsReady}\n{nameof(RemoteAddress)}: {RemoteAddress}\n{nameof(Port)}: {Port}";
         }
     }
 }

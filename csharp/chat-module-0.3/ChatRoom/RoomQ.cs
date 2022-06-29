@@ -49,7 +49,7 @@ namespace Chat
 
         public override string ToString()
         {
-            return $"{nameof(SendMessageCount)}: {SendMessageCount}\n{nameof(ReceivedMessageCount)}: {ReceivedMessageCount}\n{nameof(SendByteSize)}: {SendByteSize}\n{nameof(ReceivedByteSize)}: {ReceivedByteSize}";
+            return $"{nameof(CurrentUserCount)}: {CurrentUserCount}\n{nameof(SendMessageCount)}: {SendMessageCount}\n{nameof(ReceivedMessageCount)}: {ReceivedMessageCount}\n{nameof(SendByteSize)}: {SendByteSize}\n{nameof(ReceivedByteSize)}: {ReceivedByteSize}";
         }
     }
 
@@ -141,7 +141,17 @@ namespace Chat
                         {
                             Log.Print($"\n{user.Info}", LogLevel.DEBUG);
 
-                            IMessage message = await user.Receive();
+                            IMessage message;
+
+                            try
+                            {
+                                message = await user.Receive();
+                            }
+                            catch
+                            {
+                                Log.Print($"receive에서 연결 종료 감지 (정상 종료)\n{user.Info}", LogLevel.ERROR);
+                                break;
+                            }
                             Status.AddReceivedMessageCount(1);
                             Status.AddReceivedByteSize(message.GetFullBytesLength());
 
@@ -151,6 +161,7 @@ namespace Chat
                             });
                         }
 
+                        // 반드시 연결 해제된 유저를 동기적으로 제거 해야 함
                         Kick(user.Cid);
                     });
                 });
