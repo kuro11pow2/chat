@@ -5,7 +5,7 @@ namespace Tests
     {
         static async Task Main(string[] args)
         {
-            await RoomTests.LocalRoomTest("1234123412341234", "1234123412341234");
+            await RoomQTests.LocalRoomQTest("1234123412341234", "1234123412341234");
         }
     }
 }

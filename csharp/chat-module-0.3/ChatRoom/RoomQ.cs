@@ -14,7 +14,7 @@ namespace Chat
     using Common.Utility;
     using Chat;
 
-    class RoomStatus
+    public class RoomStatus
     {
         private long _sendMessageCount, _receivedMessageCount;
         private long _sendByteSize, _receivedByteSize;
@@ -26,23 +26,23 @@ namespace Chat
         public long ReceivedByteSize { get { return _receivedByteSize; } }
         public long CurrentUserCount { get { return _currentUserCount; } }
 
-        public void AddSendMessageCount(long n)
+        internal void AddSendMessageCount(long n)
         {
             Interlocked.Add(ref _sendMessageCount, n);
         }
-        public void AddReceivedMessageCount(long n)
+        internal void AddReceivedMessageCount(long n)
         {
             Interlocked.Add(ref _receivedMessageCount, n);
         }
-        public void AddSendByteSize(long n)
+        internal void AddSendByteSize(long n)
         {
             Interlocked.Add(ref _sendByteSize, n);
         }
-        public void AddReceivedByteSize(long n)
+        internal void AddReceivedByteSize(long n)
         {
             Interlocked.Add(ref _receivedByteSize, n);
         }
-        public void AddCurrentUserCount(long n)
+        internal void AddCurrentUserCount(long n)
         {
             Interlocked.Add(ref _currentUserCount, n);
         }
@@ -61,7 +61,7 @@ namespace Chat
         private Dictionary<string, IClient> Users;
         private ConcurrentQueue<Action> ActionQueue;
 
-        private RoomStatus Status;
+        public RoomStatus Status;
 
         private bool RoomStop;
 
@@ -88,6 +88,23 @@ namespace Chat
             await Process();
         }
 
+        private async Task Accept()
+        {
+            while (RoomStop == false)
+            {
+                IClient user = await AcceptUser();
+                Register(user);
+            }
+        }
+
+        private async Task<IClient> AcceptUser()
+        {
+            TcpClient client = await listener.AcceptTcpClientAsync();
+            User user = new User(new ConnectionContext(client));
+            Log.Print($"유저 연결됨\n{user.Info} ", LogLevel.INFO);
+            return user;
+        }
+
         private async Task Process()
         {
             while (RoomStop == false)
@@ -100,88 +117,91 @@ namespace Chat
                         Log.Print($"action을 dequeue하지 못 함");
                         continue;
                     }
-                    // async action과 일반 action은 어떻게 다르게 처리될까?
-                    await Task.Run(action);
+
+                    int maxRunningTime = 2000;
+                    CancellationTokenSource cts = new CancellationTokenSource();
+                    cts.CancelAfter(maxRunningTime);
+
+                    try
+                    {
+                        await Task.Run(action).WaitAsync(cts.Token);
+                    }
+                    catch (OperationCanceledException ex)
+                    {
+                        Log.Print($"작업 시간 초과\n{ex}", LogLevel.WARN);
+                    }
                 }
                 await Task.Delay(100);
             }
         }
 
-        private async Task<IClient> AcceptUser()
-        {
-            TcpClient client = await listener.AcceptTcpClientAsync();
-            User user = new User(new ConnectionContext(client));
-            Log.Print($"유저 연결됨\n{user.Info} ", LogLevel.INFO);
-            return user;
-        }
 
-        private async Task Accept()
+        private void Register(IClient user)
         {
-            while (RoomStop == false)
+            ActionQueue.Enqueue(() =>
             {
-                IClient user = await AcceptUser();
                 string cid = user.Cid;
-                ActionQueue.Enqueue(() => 
+                bool res = Users.TryAdd(cid, user);
+                if (false == res)
                 {
-                    bool res = Users.TryAdd(cid, user);
-                    if (false == res)
-                    {
-                        string exs = $"CID 중복\n{user.Info}";
-                        Log.Print(exs, LogLevel.ERROR);
-                        throw new InvalidDataException(exs);
-                    }
+                    string exs = $"CID 중복\n{user.Info}";
+                    Log.Print(exs, LogLevel.ERROR);
+                    throw new InvalidDataException(exs);
+                }
 
-                    Status.AddCurrentUserCount(1);
-
-                    ActionQueue.Enqueue(async () =>
-                    {
-                        ////////////////////////////////////// 무한 반복 대신 Enqueue를 해야 함 //////////////////////////////////////
-                        ///// 하나의 유저에 대한 receive 및 이후 process 작업. 
-                        while (user.IsReady)
-                        {
-                            Log.Print($"\n{user.Info}", LogLevel.DEBUG);
-
-                            IMessage message;
-
-                            try
-                            {
-                                message = await user.Receive();
-                            }
-                            catch
-                            {
-                                Log.Print($"receive에서 연결 종료 감지 (정상 종료)\n{user.Info}", LogLevel.ERROR);
-                                break;
-                            }
-                            Status.AddReceivedMessageCount(1);
-                            Status.AddReceivedByteSize(message.GetFullBytesLength());
-
-                            ActionQueue.Enqueue(async () =>
-                            {
-                                await Broadcast(user, message);
-                            });
-                        }
-
-                        // 반드시 연결 해제된 유저를 동기적으로 제거 해야 함
-                        Kick(user.Cid);
-                    });
-                });
-            }
+                Status.AddCurrentUserCount(1);
+                Activate(user);
+            });
         }
 
-        private async Task Broadcast(IClient src, IMessage message)
+        private void Activate(IClient user)
         {
-            List<Task> tasks = new List<Task>();
-            long sendCount = Users.Count;
-
-            foreach (var pair in Users)
+            ActionQueue.Enqueue(async () =>
             {
-                IClient dst = pair.Value;
-                tasks.Add(dst.Send(message));
-            }
+                while (user.IsReady)
+                {
+                    Log.Print($"\n{user.Info}", LogLevel.DEBUG);
 
-            await Task.WhenAll(tasks);
-            Status.AddSendMessageCount(sendCount);
-            Status.AddSendByteSize(sendCount * message.GetFullBytesLength());
+                    IMessage message;
+
+                    try
+                    {
+                        message = await user.Receive();
+                    }
+                    catch (IOException ex)
+                    {
+                        Log.Print($"receive에서 연결 종료 감지 (정상 종료)\n{user.Info}", LogLevel.ERROR);
+                        break;
+                    }
+                    Status.AddReceivedMessageCount(1);
+                    Status.AddReceivedByteSize(message.GetFullBytesLength());
+
+                    Broadcast(user, message);
+                }
+
+                // 반드시 연결 해제된 유저를 동기적으로 제거 해야 함
+                Kick(user.Cid);
+                Status.AddCurrentUserCount(-1);
+            });
+        }
+
+        private void Broadcast(IClient src, IMessage message)
+        {
+            ActionQueue.Enqueue(async () =>
+            {
+                List<Task> tasks = new List<Task>();
+                long sendCount = Users.Count;
+
+                foreach (var pair in Users)
+                {
+                    IClient dst = pair.Value;
+                    tasks.Add(dst.Send(message));
+                }
+
+                await Task.WhenAll(tasks);
+                Status.AddSendMessageCount(sendCount);
+                Status.AddSendByteSize(sendCount * message.GetFullBytesLength());
+            });
         }
 
         private void Kick(string cid)
@@ -201,14 +221,20 @@ namespace Chat
             Log.Print($"{cid} 유저 제거 완료", LogLevel.INFO);
         }
 
-        private void Close()
+        public void Close()
         {
-            throw new NotImplementedException();
+            RoomStop = true;
+
+            foreach (var pair in Users)
+            {
+                pair.Value?.Disconnect();
+            }
+            listener.Stop();
         }
 
         public async Task RunMonitor()
         {
-            while (true)
+            while (RoomStop == false)
             {
                 await Task.Delay(5000);
                 Log.Print($"\nQueue-{nameof(ActionQueue.Count)}: {ActionQueue.Count}\n{nameof(Status)}: {Status}", LogLevel.OFF, "server monitor");
