@@ -16,9 +16,14 @@ namespace Common.Utility
     {
         public static LogLevel PrintLevel = LogLevel.DEBUG;
         private const int Width = 3;
-        private delegate void OutStream(string obj);
-        private static OutStream Out = Console.WriteLine;
-        private static string _line = "--------------------------------------------------------------------------------------------------------------------";
+        private static readonly string _line = "--------------------------------------------------------------------------------------------------------------------";
+
+        private static void Out(object obj)
+        {
+#if !TEST
+            Console.WriteLine(obj);
+#endif
+        }
 
         /// <summary>
         /// 디버그 모드에서만 메소드 호출된다던데, 파라미터는 평가되는건지 성능 비교를 통해 파악해보기

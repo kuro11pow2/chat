@@ -51,7 +51,7 @@ jobs:
 
       - name: 테스트 실행
         run:  |
-          dotnet test --logger:junit
+          dotnet test -c Test --logger:junit
           git status
         working-directory: csharp/chat-module-0.3/Tests
 

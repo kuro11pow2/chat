@@ -61,16 +61,18 @@ namespace Chat
                     await Task.Delay(SendDelay);
 
                 string? str = "";
-                var userInputRead = Task.Run(() => Console.ReadLine());
                 int connectionCheckDelay = 2000;
 
-                CancellationTokenSource cts = new CancellationTokenSource();
-                cts.CancelAfter(connectionCheckDelay);
-                
-                if (await Task.WhenAny(userInputRead, Task.Delay(-1, cts.Token)) != userInputRead)
+                try
+                {
+                    str = ConsoleTimeOut.ReadLine(connectionCheckDelay);
+                }
+                catch (Exception ex)
+                {
+                    //Log.Print($"{ex}", LogLevel.DEBUG);
                     continue;
+                }
 
-                str = userInputRead.Result;
 
                 if (string.IsNullOrEmpty(str))
                     continue;
@@ -103,9 +105,10 @@ namespace Chat
             Log.Print($"{Cid} connection 리소스 해제 완료", LogLevel.INFO);
         }
 
-        public async Task Connect()
+        public async Task Connect(CancellationToken cancellationToken = default)
         {
-            await ConnectionContext.Connect();
+            await ConnectionContext.Connect(cancellationToken);
+            MustBeDisconnected = false;
         }
 
         public void Disconnect()
@@ -113,39 +116,39 @@ namespace Chat
             ConnectionContext.Close();
         }
 
-        public async Task Send(IMessage message)
+        public async Task Send(IMessage message, CancellationToken cancellationToken = default)
         {
             var fullBytes = message.GetFullBytes();
 
             Log.Print($"송신: {message.GetInfo()}", LogLevel.INFO);
 
             // 비동기 송신
-            await ConnectionContext.WriteAsync(fullBytes);
+            await ConnectionContext.WriteAsync(fullBytes, cancellationToken);
         }
 
-        public async Task<IMessage> Receive()
+        public async Task<IMessage> Receive(CancellationToken cancellationToken = default)
         {
             byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
-            int expectedMessageBytesLength = await ReceiveSize(fullBytes);
+            int expectedMessageBytesLength = await ReceiveSize(fullBytes, cancellationToken);
 
-            IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength);
+            IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength, cancellationToken);
             return message;
         }
 
-        private async Task<int> ReceiveSize(byte[] fullBytes)
+        private async Task<int> ReceiveSize(byte[] fullBytes, CancellationToken cancellationToken = default)
         {
-            await ReadNetworkStream(fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH);
+            await ReadNetworkStream(fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH, cancellationToken);
 
             return Utf8PayloadProtocol.DecodeSizeBytes(fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH);
         }
 
 
-        private async Task<IMessage> ReceiveExpect(byte[] fullBytes, int expectedMessageBytesLength)
+        private async Task<IMessage> ReceiveExpect(byte[] fullBytes, int expectedMessageBytesLength, CancellationToken cancellationToken = default)
         {
             IMessage message = new Utf8Message();
 
             int offset = Utf8PayloadProtocol.SIZE_BYTES_LENGTH;
-            await ReadNetworkStream(fullBytes, offset, expectedMessageBytesLength);
+            await ReadNetworkStream(fullBytes, offset, expectedMessageBytesLength, cancellationToken);
 
             message.SetBytes(fullBytes, offset + expectedMessageBytesLength);
 
@@ -154,13 +157,13 @@ namespace Chat
             return message;
         }
 
-        private async Task ReadNetworkStream(byte[] fullBytes, int offset, int count)
+        private async Task ReadNetworkStream(byte[] fullBytes, int offset, int count, CancellationToken cancellationToken = default)
         {
             int receivedMessageBytesLength = 0;
 
             while (true)
             {
-                int currentReceived = await ConnectionContext.ReadAsync(fullBytes, offset + receivedMessageBytesLength, count - receivedMessageBytesLength);
+                int currentReceived = await ConnectionContext.ReadAsync(fullBytes, offset + receivedMessageBytesLength, count - receivedMessageBytesLength, cancellationToken);
                 receivedMessageBytesLength += currentReceived;
 
                 if (currentReceived == 0)

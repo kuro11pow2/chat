@@ -8,9 +8,9 @@ namespace Common.Interface
 {
     public interface IClient
     {
-        Task Send(IMessage message);
-        Task<IMessage> Receive();
-        Task Connect();
+        Task Send(IMessage message, CancellationToken cancellationToken = default);
+        Task<IMessage> Receive(CancellationToken cancellationToken = default);
+        Task Connect(CancellationToken cancellationToken = default);
         void Disconnect();
         public bool IsReady { get; }
         public string Cid { get; }

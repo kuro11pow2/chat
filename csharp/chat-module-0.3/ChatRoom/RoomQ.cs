@@ -12,7 +12,6 @@ namespace Chat
     using Common;
     using Common.Interface;
     using Common.Utility;
-    using Chat;
 
     public class RoomStatus
     {
@@ -55,15 +54,15 @@ namespace Chat
 
     public class RoomQ
     {
-        private int Port;
-        private TcpListener listener;
+        private readonly int Port;
+        private readonly TcpListener listener;
 
-        private Dictionary<string, IClient> Users;
-        private ConcurrentQueue<Action> ActionQueue;
+        private readonly Dictionary<string, IClient> Users;
+        private readonly ConcurrentQueue<Action> ActionQueue;
 
         public RoomStatus Status;
 
-        private bool RoomStop;
+        private readonly CancellationTokenSource RoomStopTokenSource;
 
 
         public RoomQ(int port)
@@ -76,21 +75,19 @@ namespace Chat
 
             Status = new RoomStatus();
 
-            RoomStop = false;
+            RoomStopTokenSource = new CancellationTokenSource(); ;
         }
 
         public async Task Run()
         {
             listener.Start();
-
             _ = Accept();
-
             await Process();
         }
 
         private async Task Accept()
         {
-            while (RoomStop == false)
+            while (RoomStopTokenSource.IsCancellationRequested == false)
             {
                 IClient user = await AcceptUser();
                 Register(user);
@@ -99,17 +96,17 @@ namespace Chat
 
         private async Task<IClient> AcceptUser()
         {
-            TcpClient client = await listener.AcceptTcpClientAsync();
-            User user = new User(new ConnectionContext(client));
+            TcpClient client = await listener.AcceptTcpClientAsync(RoomStopTokenSource.Token);
+            User user = new(new ConnectionContext(client));
             Log.Print($"유저 연결됨\n{user.Info} ", LogLevel.INFO);
             return user;
         }
 
         private async Task Process()
         {
-            while (RoomStop == false)
+            while (RoomStopTokenSource.IsCancellationRequested == false)
             {
-                while (ActionQueue.Count > 0)
+                while (ActionQueue.IsEmpty == false)
                 {
                     ActionQueue.TryDequeue(out Action? action);
                     if (null == action)
@@ -119,11 +116,11 @@ namespace Chat
                     }
 
                     int maxRunningTime = 2000;
-                    CancellationTokenSource cts = new CancellationTokenSource();
-                    cts.CancelAfter(maxRunningTime);
+                    CancellationTokenSource timerTokenSource = TimerTokenSource.GetTimer(maxRunningTime);
 
                     try
                     {
+                        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(RoomStopTokenSource.Token, timerTokenSource.Token);
                         await Task.Run(action).WaitAsync(cts.Token);
                     }
                     catch (OperationCanceledException ex)
@@ -131,7 +128,7 @@ namespace Chat
                         Log.Print($"작업 시간 초과\n{ex}", LogLevel.WARN);
                     }
                 }
-                await Task.Delay(100);
+                await Task.Delay(100, RoomStopTokenSource.Token);
             }
         }
 
@@ -158,7 +155,7 @@ namespace Chat
         {
             ActionQueue.Enqueue(async () =>
             {
-                while (user.IsReady)
+                while (RoomStopTokenSource.IsCancellationRequested == false && user.IsReady)
                 {
                     Log.Print($"\n{user.Info}", LogLevel.DEBUG);
 
@@ -170,7 +167,7 @@ namespace Chat
                     }
                     catch (IOException ex)
                     {
-                        Log.Print($"receive에서 연결 종료 감지 (정상 종료)\n{user.Info}", LogLevel.ERROR);
+                        Log.Print($"receive에서 연결 종료 감지 (정상 종료)\n{user.Info}\n{ex}", LogLevel.ERROR);
                         break;
                     }
                     Status.AddReceivedMessageCount(1);
@@ -185,17 +182,25 @@ namespace Chat
             });
         }
 
-        private void Broadcast(IClient src, IMessage message)
+        public void Broadcast(string cid, IMessage message)
+        {
+            Users.TryGetValue(cid, out IClient? user);
+            if (user == null)
+                throw new Exception($"존재하지 않는 cid : {cid}");
+            Broadcast(user, message);
+        }
+
+        public void Broadcast(IClient src, IMessage message)
         {
             ActionQueue.Enqueue(async () =>
             {
-                List<Task> tasks = new List<Task>();
+                List<Task> tasks = new();
                 long sendCount = Users.Count;
 
                 foreach (var pair in Users)
                 {
                     IClient dst = pair.Value;
-                    tasks.Add(dst.Send(message));
+                    tasks.Add(dst.Send(message, RoomStopTokenSource.Token));
                 }
 
                 await Task.WhenAll(tasks);
@@ -204,7 +209,7 @@ namespace Chat
             });
         }
 
-        private void Kick(string cid)
+        public void Kick(string cid)
         {
             Users.Remove(cid, out IClient? tmpUser);
 
@@ -223,7 +228,9 @@ namespace Chat
 
         public void Close()
         {
-            RoomStop = true;
+            Log.Print($"방 종료 시작", LogLevel.INFO);
+
+            RoomStopTokenSource.Cancel();
 
             foreach (var pair in Users)
             {
@@ -232,13 +239,31 @@ namespace Chat
             listener.Stop();
         }
 
+        public string Info()
+        {
+            return $"\nQueue-{nameof(ActionQueue.Count)}: {ActionQueue.Count}\n{nameof(Status)}: {Status}";
+        }
+
         public async Task RunMonitor()
         {
-            while (RoomStop == false)
+            while (RoomStopTokenSource.IsCancellationRequested == false)
             {
+                Log.Print(Info(), LogLevel.OFF, "server monitor");
                 await Task.Delay(5000);
-                Log.Print($"\nQueue-{nameof(ActionQueue.Count)}: {ActionQueue.Count}\n{nameof(Status)}: {Status}", LogLevel.OFF, "server monitor");
             }
+        }
+
+        public async Task UserCommand()
+        {
+            await Task.Run(() =>
+            {
+                int checkDelay = 1000;
+
+                while (RoomStopTokenSource.IsCancellationRequested == false)
+                {
+                    ProcessUserInput.Run(this, checkDelay);
+                }
+            });
         }
     }
 }

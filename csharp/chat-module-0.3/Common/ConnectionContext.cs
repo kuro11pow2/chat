@@ -7,10 +7,10 @@ namespace Common
 
     public interface IConnectionContext
     {
-        Task Connect();
+        Task Connect(CancellationToken cancellationToken = default);
         void Close();
-        ValueTask WriteAsync(ReadOnlyMemory<byte> buffer);
-        Task<int> ReadAsync(byte[] buffer, int offset, int count);
+        ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default);
+        Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default);
         string ConnectionId { get; }
         string RemoteAddress { get; }
         int Port { get; }
@@ -48,7 +48,7 @@ namespace Common
             Ready();
         }
 
-        public async Task Connect()
+        public async Task Connect(CancellationToken cancellationToken = default)
         {
             if (IsReady == true)
             {
@@ -84,18 +84,18 @@ namespace Common
                 Client.Close();
         }
 
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer)
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             if (Stream == null || IsReady == false)
                 throw new IOException("연결되어 있지 않음");
-            return Stream.WriteAsync(buffer);
+            return Stream.WriteAsync(buffer, cancellationToken);
         }
 
-        public Task<int> ReadAsync(byte[] buffer, int offset, int count)
+        public Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (Stream == null || IsReady == false)
                 throw new IOException("연결되어 있지 않음");
-            return Stream.ReadAsync(buffer, offset, count);
+            return Stream.ReadAsync(buffer, offset, count, cancellationToken);
         }
 
         public override string ToString()

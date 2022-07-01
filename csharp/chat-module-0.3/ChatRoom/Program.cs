@@ -34,12 +34,13 @@ namespace Chat
                 await object2FileHelper.Save(config);
             }
 #elif DEBUG || TEST
-            Config config = new Config();
+            Config config = new();
 #endif
             Log.PrintLevel = config.PrintLevel;
-            RoomQ room = new RoomQ(config.Port);
+            RoomQ room = new(config.Port);
 
-            _ = room.RunMonitor();
+            //_ = room.RunMonitor();
+            _ = room.UserCommand();
             await room.Run();
         }
     }
