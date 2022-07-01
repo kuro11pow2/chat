@@ -33,10 +33,10 @@ namespace Chat
                 await object2FileHelper.Save(config);
             }
 #elif DEBUG || TEST
-            Config config = new Config();
+            Config config = new();
 #endif
             Log.PrintLevel = config.PrintLevel;
-            User user = new User(new ConnectionContext(config.ServerAddress, config.Port));
+            User user = new(new ConnectionContext(config.ServerAddress, config.Port));
 
             while (true)
             {

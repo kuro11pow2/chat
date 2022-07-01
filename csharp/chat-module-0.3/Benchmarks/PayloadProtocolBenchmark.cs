@@ -12,13 +12,13 @@ namespace Benchmarks
     {
         public static string GetKorean(int length)
         {
-            Random random = new Random();
-            StringBuilder stringBuilder = new StringBuilder();
+            Random random = new();
+            StringBuilder stringBuilder = new();
             int rangeStart = 0xAC00, rangeEnd = 0xD7A3;
 
             for (int i = 0; i < length; i++)
             {
-                Rune rune = new Rune(random.Next(rangeStart, rangeEnd));
+                Rune rune = new(random.Next(rangeStart, rangeEnd));
                 stringBuilder.Append(rune);
             }
 
@@ -27,13 +27,13 @@ namespace Benchmarks
 
         public static string GetJapanese(int length)
         {
-            Random random = new Random();
-            StringBuilder stringBuilder = new StringBuilder();
+            Random random = new();
+            StringBuilder stringBuilder = new();
             int rangeStart = 0x4E00, rangeEnd = 0x9fBF;
 
             for (int i = 0; i < length; i++)
             {
-                Rune rune = new Rune(random.Next(rangeStart, rangeEnd));
+                Rune rune = new(random.Next(rangeStart, rangeEnd));
                 stringBuilder.Append(rune);
             }
 

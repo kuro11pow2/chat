@@ -4,8 +4,8 @@ namespace Chat
 {
     public class Object2FileHelper<T>
     {
-        private string FilePath;
-        private JsonSerializerOptions Options = new() { WriteIndented = true, IncludeFields = true, };
+        private readonly string FilePath;
+        private readonly JsonSerializerOptions Options = new() { WriteIndented = true, IncludeFields = true, };
 
         public Object2FileHelper(string filePath)
         {
