@@ -15,14 +15,14 @@
             int port = 1234;
             int userCount = 100;
 
-            RoomQ room = new RoomQ(port);
+            RoomQ room = new(port);
             _ = room.Run();
 
-            List<User> users = new List<User>();
+            List<User> users = new();
             for (int i = 0; i < userCount; i++)
             {
                 IConnectionContext context = new ConnectionContext("127.0.0.1", port);
-                User user = new User(context);
+                User user = new(context);
                 await user.Connect();
                 users.Add(new User(context));
             }
@@ -40,7 +40,7 @@
                 await users[i].Send(message);
             }
 
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = new();
             for (int i = 0; i < users.Count; i++)
             {
                 for (int j = 0; j < users.Count; j++)
