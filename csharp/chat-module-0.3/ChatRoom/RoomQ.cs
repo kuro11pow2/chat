@@ -241,14 +241,14 @@ namespace Chat
 
         public string Info()
         {
-            return $"\nQueue-{nameof(ActionQueue.Count)}: {ActionQueue.Count}\n{nameof(Status)}: {Status}";
+            return $"{nameof(ActionQueue)} 길이: {ActionQueue.Count}\n{nameof(Status)}: {Status}";
         }
 
         public async Task RunMonitor()
         {
             while (RoomStopTokenSource.IsCancellationRequested == false)
             {
-                Log.Print(Info(), LogLevel.OFF, "server monitor");
+                Log.Print(Info(), LogLevel.RETURN, "server monitor");
                 await Task.Delay(5000);
             }
         }

@@ -6,6 +6,7 @@ namespace Common.Utility
     public enum LogLevel
     {
         OFF,
+        RETURN,
         ERROR,
         WARN,
         INFO,
@@ -54,6 +55,8 @@ namespace Common.Utility
         {
             switch (level)
             {
+                case LogLevel.RETURN:
+                    return "RETURN";
                 case LogLevel.ERROR:
                     return "ERROR";
                 case LogLevel.WARN:

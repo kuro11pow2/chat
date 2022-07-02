@@ -72,7 +72,7 @@ namespace Common
             _connectionId = $"{Client.Client.LocalEndPoint}-{Client.Client.RemoteEndPoint}";
             IsReady = true;
 
-            Log.Print($"{ConnectionId} 연결 수립", LogLevel.OFF);
+            Log.Print($"{ConnectionId} 연결 수립", LogLevel.INFO);
         }
 
         public void Close()
