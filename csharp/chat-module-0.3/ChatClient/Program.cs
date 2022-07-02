@@ -19,7 +19,7 @@ namespace Chat
             Log.PrintHeader();
 #if RELEASE
             const string filePath = "user_config.json";
-            Object2FileHelper<Config> object2FileHelper = new Object2FileHelper<Config>(filePath);
+            Object2File<Config> object2FileHelper = new Object2File<Config>(filePath);
             Config config;
 
             try

@@ -134,12 +134,16 @@ namespace Chat
             // 비동기 송신
             await ConnectionContext.WriteAsync(fullBytes, cancellationToken);
         }
+
         public async Task<IMessage> Receive(CancellationToken cancellationToken = default)
         {
-            byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
+            byte[] sizeBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH];
             using (await _mutex.LockAsync())
             {
-                int expectedMessageBytesLength = await ReceiveSize(fullBytes, cancellationToken);
+                int expectedMessageBytesLength = await ReceiveSize(sizeBytes, cancellationToken);
+                byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + expectedMessageBytesLength];
+                Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH);
+
                 IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength, cancellationToken);
                 return message;
             }
@@ -184,7 +188,7 @@ namespace Chat
                 }
                 if (receivedMessageBytesLength > count)
                 {
-                    string ex = "받기로 한 것보다 큰 메시지 바이트를 수신함";
+                    string ex = "받기로 한 것보다 많은 메시지 바이트를 수신함";
                     Log.Print(ex, LogLevel.WARN);
                     throw new ProtocolBufferOverflowException(ex);
                 }
