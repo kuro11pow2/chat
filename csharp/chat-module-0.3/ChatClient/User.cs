@@ -10,6 +10,8 @@ using Common.Utility;
 using Common.Interface;
 using System.Net;
 
+using Nito.AsyncEx;
+
 namespace Chat
 {
     public class User : IClient
@@ -24,7 +26,14 @@ namespace Chat
 
         public string Info { get { return $"{nameof(Cid)}: {Cid}\n{nameof(SendDelay)}: {SendDelay}\n{ConnectionContext}"; } }
 
+        // https://github.com/StephenCleary/AsyncEx
+        private readonly AsyncLock _mutex = new AsyncLock();
 
+        /// <summary>
+        /// connectionContext는 유일한 참조를 가져야 함.
+        /// </summary>
+        /// <param name="connectionContext"></param>
+        /// <param name="sendDelay"></param>
         public User(IConnectionContext connectionContext, int sendDelay = 0)
         {
             ConnectionContext = connectionContext;
@@ -125,14 +134,15 @@ namespace Chat
             // 비동기 송신
             await ConnectionContext.WriteAsync(fullBytes, cancellationToken);
         }
-
         public async Task<IMessage> Receive(CancellationToken cancellationToken = default)
         {
             byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + Utf8PayloadProtocol.MAX_MESSAGE_BYTES_LENGTH];
-            int expectedMessageBytesLength = await ReceiveSize(fullBytes, cancellationToken);
-
-            IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength, cancellationToken);
-            return message;
+            using (await _mutex.LockAsync())
+            {
+                int expectedMessageBytesLength = await ReceiveSize(fullBytes, cancellationToken);
+                IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength, cancellationToken);
+                return message;
+            }
         }
 
         private async Task<int> ReceiveSize(byte[] fullBytes, CancellationToken cancellationToken = default)

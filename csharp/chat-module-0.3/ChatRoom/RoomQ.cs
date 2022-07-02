@@ -115,7 +115,7 @@ namespace Chat
                         continue;
                     }
 
-                    int maxRunningTime = 2000;
+                    int maxRunningTime = 1000;
                     CancellationTokenSource timerTokenSource = TimerTokenSource.GetTimer(maxRunningTime);
 
                     try
