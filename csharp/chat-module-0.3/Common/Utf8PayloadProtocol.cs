@@ -36,7 +36,21 @@ namespace Common
         /// </summary>
         public const int MAX_MESSAGE_BYTES_LENGTH = 1 << (8 * SIZE_BYTES_LENGTH) - 1;
 
-        public static byte[] EncodeMessage(string str)
+        public static void GetPayloadBytes(string str, out byte[] sizeBytes, out byte[] messageBytes)
+        {
+            messageBytes = EncodePayload(str);
+            sizeBytes = EncodeSizeBytes(messageBytes.Length);
+        }
+
+        private static void MergeBytes(out byte[] fullBytes, byte[] sizeBytes, byte[] messageBytes)
+        {
+            fullBytes = new byte[sizeBytes.Length + messageBytes.Length];
+
+            Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
+            Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
+        }
+
+        public static byte[] EncodePayload(string str)
         {
             byte[] tmp = Encoding.UTF8.GetBytes(str);
             if (tmp.Length > MAX_MESSAGE_BYTES_LENGTH)
@@ -44,7 +58,7 @@ namespace Common
             return Encoding.UTF8.GetBytes(str);
         }
 
-        public static string DecodeMessage(byte[] bytes, int start, int length)
+        public static string DecodePayload(byte[] bytes, int start, int length)
         {
             if (length - start > MAX_MESSAGE_BYTES_LENGTH)
                 throw new ProtocolBufferOverflowException($"MESSAGE_BYTES {MAX_MESSAGE_BYTES_LENGTH} bytes 초과");
@@ -71,25 +85,19 @@ namespace Common
                 ret += sizeBytes[i];
             }
             return ret;
-        } 
+        }
 
         public static byte[] Encode(string str)
         {
-            byte[] messageBytes = EncodeMessage(str);
-            int messageBytesLength = messageBytes.Length;
-
-            byte[] sizeBytes = EncodeSizeBytes(messageBytesLength);
-            byte[] fullBytes = new byte[sizeBytes.Length + messageBytesLength];
-
-            Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, sizeBytes.Length);
-            Buffer.BlockCopy(messageBytes, 0, fullBytes, sizeBytes.Length, messageBytes.Length);
+            GetPayloadBytes(str, out byte[] sizeBytes, out byte[] messageBytes);
+            MergeBytes(out byte[] fullBytes, sizeBytes, messageBytes);
 
             return fullBytes;
         }
 
         public static string Decode(byte[] fullBytes, int bytesLength)
         {
-            return DecodeMessage(fullBytes, SIZE_BYTES_LENGTH, bytesLength - SIZE_BYTES_LENGTH);
+            return DecodePayload(fullBytes, SIZE_BYTES_LENGTH, bytesLength - SIZE_BYTES_LENGTH);
         }
     }
 }

@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading.Tasks;
+﻿
+using System.Reflection;
 
 namespace Chat
 {
@@ -18,19 +12,26 @@ namespace Chat
     {
         public static bool Run(RoomQ room, int checkDelay)
         {
-            GetUserInput(checkDelay, out bool isTimeout, out string[]? tokens);
-
             bool commandResult = false;
             string commandResultStr = "잘못된 입력입니다";
 
+            GetUserInput(checkDelay, out bool isTimeout, out string[]? tokens);
             if (isTimeout) return true;
-            else if (tokens?[0] == "close") RunClose(tokens, room, out commandResult, out commandResultStr);
-            else if (tokens?[0] == "info") RunInfo(tokens, room, out commandResult, out commandResultStr);
-            else if(tokens?[0] == "kick") RunKick(tokens, room, out commandResult, out commandResultStr);
-            else if(tokens?[0] == "loglevel") RunLogLevel(tokens, out commandResult, out commandResultStr);
-            else if(tokens?[0] == "broadcast") RunBroadcast(tokens, room, out commandResult, out commandResultStr);
+            if (tokens != null)
+            {
+                Dictionary<string, Action> commands = new Dictionary<string, Action>
+                {
+                    { "close", () => RunClose(tokens, room, out commandResult, out commandResultStr) },
+                    { "info", () => RunInfo(tokens, room, out commandResult, out commandResultStr) },
+                    { "kick", () => RunKick(tokens, room, out commandResult, out commandResultStr) },
+                    { "loglevel", () => RunLogLevel(tokens, out commandResult, out commandResultStr) },
+                    { "broadcast", () => RunBroadcast(tokens, room, out commandResult, out commandResultStr) },
+                };
+                if (tokens[0] == "help") RunHelp(tokens, commands, out commandResult, out commandResultStr);
+                else if (commands.TryGetValue(tokens[0], out Action action)) action();
+            }
 
-            Log.Print(commandResultStr, LogLevel.RETURN, "명령 결과");
+            Log.Print(commandResultStr, LogLevel.RETURN, "command result");
             return commandResult;
         }
 
@@ -52,6 +53,19 @@ namespace Chat
 
             inputStr = inputStr?.Trim();
             tokens = inputStr?.Split(" ");
+        }
+        private static void RunHelp(string[] tokens, Dictionary<string, Action> commands, out bool res, out string resStr)
+        {
+            const int tokenCount = 1;
+            if (tokens.Length != tokenCount)
+            {
+                res = false;
+                resStr = $"인자의 개수는 {tokenCount}개여야 합니다";
+                return;
+            }
+
+            res = true;
+            resStr = $"도움말 출력\n[명령어 목록]\n{string.Join("\n", commands.Keys.ToArray())}";
         }
 
         private static void RunClose(string[] tokens, RoomQ room, out bool res, out string resStr)
@@ -80,8 +94,12 @@ namespace Chat
                 return;
             }
 
+            Assembly thisAssem = typeof(RoomQ).Assembly;
+            AssemblyName thisAssemName = thisAssem.GetName();
+            Version? ver = thisAssemName.Version;
+
             res = true;
-            resStr = $"[방 정보]\n{room.Info()}\n\n[설정 정보]\n{nameof(Log.PrintLevel)}: {Log.PrintLevel}";
+            resStr = $"정보 출력\n[Room Info]\n{room.Info()}\n\n[Config]\n{nameof(Log.PrintLevel)}: {Log.PrintLevel}\n{nameof(RoomQ)} Version: {thisAssemName.Name}-{ver}, Built Time: {BuildVersion2DateTime.Get(ver)}";
         }
         private static void RunKick(string[] tokens, RoomQ room, out bool res, out string resStr)
         {
@@ -153,7 +171,7 @@ namespace Chat
 
         private static void RunBroadcast(string[] tokens, RoomQ room, out bool res, out string resStr)
         {
-            const int tokenCount = 3;
+            const int tokenCount = 2;
             if (tokens.Length != tokenCount)
             {
                 res = false;
@@ -161,16 +179,17 @@ namespace Chat
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(tokens[1]) && string.IsNullOrWhiteSpace(tokens[2]))
+            if (string.IsNullOrWhiteSpace(tokens[1]))
             {
                 res = false;
-                resStr = $"#1 또는 #2 인자의 값은 null이나 공백일 수 없습니다";
+                resStr = $"#1 인자의 값은 null이나 공백일 수 없습니다";
+                return;
             }
 
             Utf8Message message = new();
-            message.SetMessage(tokens[2]);
+            message.SetMessage(tokens[1]);
 
-            room.Broadcast(tokens[1], message);
+            room.Broadcast(new User(new ConnectionContext("host broadcast", -1)), message);
 
             res = true;
             resStr = $"브로드캐스트\n{message.GetInfo()}";

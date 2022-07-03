@@ -13,7 +13,7 @@
         public void Utf8PayloadProtocol_EncodeTest(string input, string expected)
         {
             expected = expected.ToUpper();
-            var actual = Convert.ToHexString(Utf8PayloadProtocol.EncodeMessage(input));
+            var actual = Convert.ToHexString(Utf8PayloadProtocol.EncodePayload(input));
             Assert.Equal(actual, expected);
         }
 
@@ -29,7 +29,7 @@
         {
             input = input.ToUpper();
             var inputHex = Convert.FromHexString(input);
-            var actual = Utf8PayloadProtocol.DecodeMessage(inputHex, 0, inputHex.Length);
+            var actual = Utf8PayloadProtocol.DecodePayload(inputHex, 0, inputHex.Length);
             Assert.Equal(actual, expected);
         }
 

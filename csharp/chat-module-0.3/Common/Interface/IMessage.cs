@@ -11,9 +11,8 @@ namespace Common.Interface
         public void SetMessage(string str);
         public void SetBytes(byte[] bytes, int messageLength);
         public string GetMessage();
-        public ReadOnlyMemory<byte> GetFullBytes();
+        public Memory<byte> GetFullBytes();
         public int GetFullBytesLength();
         public string GetInfo();
-
     }
 }

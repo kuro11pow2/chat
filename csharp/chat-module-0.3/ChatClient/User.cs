@@ -117,6 +117,7 @@ namespace Chat
         public async Task Connect(CancellationToken cancellationToken = default)
         {
             await ConnectionContext.Connect(cancellationToken);
+            
             MustBeDisconnected = false;
         }
 
@@ -138,7 +139,7 @@ namespace Chat
         public async Task<IMessage> Receive(CancellationToken cancellationToken = default)
         {
             byte[] sizeBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH];
-            using (await _mutex.LockAsync())
+            using (await _mutex.LockAsync(cancellationToken))
             {
                 int expectedMessageBytesLength = await ReceiveSize(sizeBytes, cancellationToken);
                 byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + expectedMessageBytesLength];

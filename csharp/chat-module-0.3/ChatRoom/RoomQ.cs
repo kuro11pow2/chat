@@ -7,6 +7,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
+using System.Reflection;
+
 namespace Chat
 {
     using Common;
@@ -52,13 +54,24 @@ namespace Chat
         }
     }
 
+    public class Work
+    {
+        public string Name { get; }
+        public Func<Task> Task { get; }
+        public Work(string name, Func<Task> task)
+        {
+            Name = name;
+            Task = task;
+        }
+    }
+
     public class RoomQ
     {
         private readonly int Port;
         private readonly TcpListener listener;
 
-        private readonly Dictionary<string, IClient> Users;
-        private readonly ConcurrentQueue<Action> ActionQueue;
+        private readonly ConcurrentDictionary<string, IClient> Users;
+        private readonly BlockingCollection<Work> WorkQueue;
 
         public RoomStatus Status;
 
@@ -70,8 +83,8 @@ namespace Chat
             Port = port;
             listener = new TcpListener(IPAddress.Any, Port);
 
-            Users = new Dictionary<string, IClient>();
-            ActionQueue = new ConcurrentQueue<Action>();
+            Users = new ConcurrentDictionary<string, IClient>();
+            WorkQueue = new BlockingCollection<Work>();
 
             Status = new RoomStatus();
 
@@ -102,58 +115,82 @@ namespace Chat
             return user;
         }
 
+        /// <summary>
+        /// https://docs.microsoft.com/en-us/dotnet/standard/collections/thread-safe/blockingcollection-overview
+        /// https://chomdoo.tistory.com/19
+        /// </summary>
+        /// <returns></returns>
         private async Task Process()
         {
-            while (RoomStopTokenSource.IsCancellationRequested == false)
-            {
-                while (ActionQueue.IsEmpty == false)
-                {
-                    ActionQueue.TryDequeue(out Action? action);
-                    if (null == action)
-                    { 
-                        Log.Print($"action을 dequeue하지 못 함");
-                        continue;
-                    }
+            //const int takeDelay = 100;
+            const int maxRunningTime = 1000;
 
-                    int maxRunningTime = 1000;
-                    CancellationTokenSource timerTokenSource = TimerTokenSource.GetTimer(maxRunningTime);
+            await Task.Run(async () =>
+            {
+                while (RoomStopTokenSource.IsCancellationRequested == false || !WorkQueue.IsCompleted)
+                {
+                    Work? work = null;
 
                     try
                     {
-                        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(RoomStopTokenSource.Token, timerTokenSource.Token);
-                        await Task.Run(action).WaitAsync(cts.Token);
+                        work = WorkQueue.Take(RoomStopTokenSource.Token);
+                        //if (WorkQueue.TryTake(out work, takeDelay, RoomStopTokenSource.Token) == false)
+                        //    continue;
                     }
-                    catch (OperationCanceledException ex)
+                    catch (InvalidOperationException)
                     {
-                        Log.Print($"작업 시간 초과\n{ex}", LogLevel.WARN);
+                        Log.Print($"ActionQueue에서 Take 할 수 없는 상태", LogLevel.ERROR);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Log.Print($"WorkQueue 동작 취소됨", LogLevel.ERROR);
+                    }
+
+                    if (work != null)
+                    {
+                        CancellationTokenSource timerTokenSource = TimerTokenSource.GetTimer(maxRunningTime);
+
+                        try
+                        {
+                            CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(RoomStopTokenSource.Token, timerTokenSource.Token);
+                            await Task.Run(work.Task).WaitAsync(cts.Token);
+                        }
+                        catch (OperationCanceledException ex)
+                        {
+                            Log.Print($"작업 시간 초과 : {work.Name}\n{ex}", LogLevel.WARN);
+                        }
                     }
                 }
-                await Task.Delay(100, RoomStopTokenSource.Token);
-            }
+            });
         }
-
 
         private void Register(IClient user)
         {
-            ActionQueue.Enqueue(() =>
+            var funcTask = new Func<Task>(async () =>
             {
-                string cid = user.Cid;
-                bool res = Users.TryAdd(cid, user);
-                if (false == res)
+                await Task.Run(() =>
                 {
-                    string exs = $"CID 중복\n{user.Info}";
-                    Log.Print(exs, LogLevel.ERROR);
-                    throw new InvalidDataException(exs);
-                }
+                    string cid = user.Cid;
 
-                Status.AddCurrentUserCount(1);
-                Activate(user);
-            });
+                    bool res = Users.TryAdd(cid, user);
+                    if (false == res)
+                    {
+                        string exs = $"CID 중복\n{user.Info}";
+                        Log.Print(exs, LogLevel.ERROR);
+                        throw new InvalidDataException(exs);
+                    }
+
+                    Status.AddCurrentUserCount(1);
+                    Activate(user);
+                });
+            }); 
+
+            WorkQueue.Add(new Work($"{nameof(Register)}", funcTask));
         }
 
         private void Activate(IClient user)
         {
-            ActionQueue.Enqueue(async () =>
+            Task.Run(async () =>
             {
                 while (RoomStopTokenSource.IsCancellationRequested == false && user.IsReady)
                 {
@@ -170,16 +207,22 @@ namespace Chat
                         Log.Print($"receive에서 연결 종료 감지 (정상 종료)\n{user.Info}\n{ex}", LogLevel.ERROR);
                         break;
                     }
+
                     Status.AddReceivedMessageCount(1);
                     Status.AddReceivedByteSize(message.GetFullBytesLength());
 
-                    Broadcast(user, message);
+                    ProcessUserRequest(user, message);
                 }
 
                 // 반드시 연결 해제된 유저를 동기적으로 제거 해야 함
                 Kick(user.Cid);
                 Status.AddCurrentUserCount(-1);
             });
+        }
+
+        private void ProcessUserRequest(IClient user, IMessage message)
+        {
+            Broadcast(user, message);
         }
 
         public void Broadcast(string cid, IMessage message)
@@ -192,7 +235,7 @@ namespace Chat
 
         public void Broadcast(IClient src, IMessage message)
         {
-            ActionQueue.Enqueue(async () =>
+            var funcTask = new Func<Task>(async () =>
             {
                 List<Task> tasks = new();
                 long sendCount = Users.Count;
@@ -200,22 +243,45 @@ namespace Chat
                 foreach (var pair in Users)
                 {
                     IClient dst = pair.Value;
-                    tasks.Add(dst.Send(message, RoomStopTokenSource.Token));
+                    string info = dst.Info;
+                    try
+                    {
+                        tasks.Add(dst.Send(message, RoomStopTokenSource.Token));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Print($"Broadcast 시작중 연결 종료 감지\n{info}\n{ex}", LogLevel.ERROR);
+                    }
                 }
 
-                await Task.WhenAll(tasks);
+                try
+                {
+                    await Task.WhenAll(tasks);
+                }
+                catch (Exception ex)
+                {
+                    Log.Print($"Broadcast 진행중 연결 종료 감지\n{ex}", LogLevel.ERROR);
+                }
                 Status.AddSendMessageCount(sendCount);
                 Status.AddSendByteSize(sendCount * message.GetFullBytesLength());
             });
+
+            WorkQueue.Add(new Work($"{nameof(Broadcast)}", funcTask));
         }
 
         public void Kick(string cid)
         {
             Users.Remove(cid, out IClient? tmpUser);
 
+            if (tmpUser == null)
+            {
+                Log.Print($"{cid} 유저가 존재하지 않음", LogLevel.ERROR);
+                return;
+            }
+
             try
             {
-                tmpUser?.Disconnect();
+                tmpUser.Disconnect();
                 Log.Print($"{cid} connection 리소스 해제 완료", LogLevel.INFO);
             }
             catch (Exception ex)
@@ -231,17 +297,18 @@ namespace Chat
             Log.Print($"방 종료 시작", LogLevel.INFO);
 
             RoomStopTokenSource.Cancel();
+            WorkQueue.CompleteAdding();
+            listener.Stop();
 
             foreach (var pair in Users)
             {
                 pair.Value?.Disconnect();
             }
-            listener.Stop();
         }
 
         public string Info()
         {
-            return $"{nameof(ActionQueue)} 길이: {ActionQueue.Count}\n{nameof(Status)}: {Status}";
+            return $"{nameof(WorkQueue)} length: {WorkQueue.Count}\n{nameof(Status)}: {Status}";
         }
 
         public async Task RunMonitor()

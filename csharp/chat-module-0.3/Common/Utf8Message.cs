@@ -27,7 +27,7 @@ namespace Common
         }
 
 
-        public ReadOnlyMemory<byte> GetFullBytes()
+        public Memory<byte> GetFullBytes()
         {
             return FullBytes;
         }

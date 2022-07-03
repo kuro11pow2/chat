@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Configurations>Debug;Release;Test</Configurations>
+    <Deterministic>false</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>
