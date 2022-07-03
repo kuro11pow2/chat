@@ -1,5 +1,51 @@
 [![run unit test](https://github.com/kuro11pow2/chat/actions/workflows/main.yml/badge.svg)](https://github.com/kuro11pow2/chat/actions/workflows/main.yml)
 
+# Network Input Flow
+```mermaid
+flowchart TD
+    cl1(Client1)
+    listener(Listener)
+    receiver(Receiver1)
+    std(StandardIOManager)
+    dm(DataManager)
+    pqueue(JobQueue)
+    pprocessor(Processor)
+    cqueue(JobQueue)
+    cprocessor(Processor)
+    um(UserManager)
+
+    cl1 --> |1. bytes| receiver
+    
+    subgraph Server
+        subgraph ConnectionManager
+            listener
+            receiver
+            pqueue
+            pprocessor
+        end
+        std
+        subgraph Consumer    
+            cqueue
+            cprocessor
+        end
+
+        receiver --> |2. cid, bytes| pqueue
+        pqueue --> |3. cid, bytes| pprocessor
+        pprocessor --> |4. bytes| dm
+        dm --> |5. message| pprocessor
+        pprocessor --> |6. cid| um
+        um --> |7. uid| pprocessor
+        pprocessor --> |8. uid, message| cqueue
+        cqueue --> |9. uid, message| cprocessor
+        
+        
+        
+    end
+    
+    
+```
+
+
 # Class Diagram V1
 ```mermaid
 classDiagram
