@@ -22,9 +22,11 @@ namespace Common.Utility
             // 빌드 번호  Build Number
             // 수정 버전  Revision NUmber
 
-            //매개 변수가 존재할 경우
+            //매개 변수가 없는 경우
             if (version == null)
                 version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            if (version == null)
+                throw new NullReferenceException("버전 객체가 null입니다");
 
             //세번째 값(Build Number)은 2000년 1월 1일부터
             //Build된 날짜까지의 총 일(Days) 수 이다.
@@ -34,7 +36,7 @@ namespace Common.Utility
             //네번째 값(Revision NUmber)은 자정으로부터 Build된
             //시간까지의 지나간 초(Second) 값 이다.
             int intSeconds = version.Revision;
-            intSeconds = intSeconds * 2;
+            intSeconds *= 2;
             dtBuild = dtBuild.AddSeconds(intSeconds);
 
 

@@ -6,11 +6,12 @@ using System.Threading.Tasks;
 
 namespace Common.Interface
 {
-    public interface IMessage
+    public interface IPacket
     {
-        public void SetMessage(string str);
-        public void SetBytes(byte[] bytes, int messageLength);
-        public string GetMessage();
+        public void Set(Message message);
+        public void Set(string str);
+        public void Set(byte[] bytes, int messageLength);
+        public string GetRawString();
         public Memory<byte> GetFullBytes();
         public int GetFullBytesLength();
         public string GetInfo();

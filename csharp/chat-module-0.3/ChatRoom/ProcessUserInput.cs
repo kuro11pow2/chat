@@ -19,7 +19,7 @@ namespace Chat
             if (isTimeout) return true;
             if (tokens != null)
             {
-                Dictionary<string, Action> commands = new Dictionary<string, Action>
+                Dictionary<string, Action> commands = new()
                 {
                     { "close", () => RunClose(tokens, room, out commandResult, out commandResultStr) },
                     { "info", () => RunInfo(tokens, room, out commandResult, out commandResultStr) },
@@ -28,7 +28,7 @@ namespace Chat
                     { "broadcast", () => RunBroadcast(tokens, room, out commandResult, out commandResultStr) },
                 };
                 if (tokens[0] == "help") RunHelp(tokens, commands, out commandResult, out commandResultStr);
-                else if (commands.TryGetValue(tokens[0], out Action action)) action();
+                else if (commands.TryGetValue(tokens[0], out Action? action)) action();
             }
 
             Log.Print(commandResultStr, LogLevel.RETURN, "command result");
@@ -186,10 +186,13 @@ namespace Chat
                 return;
             }
 
-            Utf8Message message = new();
-            message.SetMessage(tokens[1]);
+            Message message = new();
+            message.SetBroadcast(tokens[1]);
 
-            room.Broadcast(new User(new ConnectionContext("host broadcast", -1)), message);
+            IPacket packet = new Utf8Packet();
+            packet.Set(message);
+
+            room.Broadcast(new User(new ConnectionContext("host broadcast", -1)), packet);
 
             res = true;
             resStr = $"브로드캐스트\n{message.GetInfo()}";

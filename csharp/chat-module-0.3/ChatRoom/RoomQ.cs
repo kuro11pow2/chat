@@ -196,7 +196,7 @@ namespace Chat
                 {
                     Log.Print($"\n{user.Info}", LogLevel.DEBUG);
 
-                    IMessage message;
+                    IPacket message;
 
                     try
                     {
@@ -220,20 +220,71 @@ namespace Chat
             });
         }
 
-        private void ProcessUserRequest(IClient user, IMessage message)
+        private void ProcessUserRequest(IClient user, IPacket req)
         {
-            Broadcast(user, message);
+            string jsonstr = req.GetRawString();
+            Message reqMsg = Serializer<Message>.Deserialize(jsonstr);
+            Message resMsg = new Message();
+            IPacket res = new Utf8Packet();
+
+            if (reqMsg.Type <= MessageType.REQ_START || reqMsg.Type >= MessageType.REQ_END)
+            {
+                resMsg.SetBadReq();
+                res.Set(resMsg);
+                Send(user, res);
+                return;
+            }
+
+            if (reqMsg.Type == MessageType.PING)
+            {
+                resMsg.SetSuccess();
+                res.Set(resMsg);
+                Send(user, res);
+                return;
+            }
+            if (reqMsg.Type == MessageType.BROADCAST)
+            {
+                resMsg.SetMessage(reqMsg.Str);
+                res.Set(resMsg);
+                Broadcast(user, res);
+                return;
+            }
+
+            resMsg.SetCantHandleReq();
+            res.Set(resMsg);
+            Send(user, res);
         }
 
-        public void Broadcast(string cid, IMessage message)
+        public void Send(IClient dst, IPacket packet)
+        {
+            var funcTask = new Func<Task>(async () =>
+            {
+                string info = dst.Info;
+                try
+                {
+                    await dst.Send(packet, RoomStopTokenSource.Token);
+                }
+                catch (Exception ex)
+                {
+                    Log.Print($"{nameof(Send)}에서 연결 종료 감지\n{info}\n{ex}", LogLevel.ERROR);
+                }
+
+                Status.AddSendMessageCount(1);
+                Status.AddSendByteSize(packet.GetFullBytesLength());
+            });
+
+            WorkQueue.Add(new Work($"{nameof(Send)}", funcTask));
+        }
+
+        public void Broadcast(string cid, IPacket packet)
         {
             Users.TryGetValue(cid, out IClient? user);
             if (user == null)
                 throw new Exception($"존재하지 않는 cid : {cid}");
-            Broadcast(user, message);
+            Broadcast(user, packet);
         }
 
-        public void Broadcast(IClient src, IMessage message)
+        public void Broadcast(IClient src, IPacket packet)
         {
             var funcTask = new Func<Task>(async () =>
             {
@@ -246,7 +297,7 @@ namespace Chat
                     string info = dst.Info;
                     try
                     {
-                        tasks.Add(dst.Send(message, RoomStopTokenSource.Token));
+                        tasks.Add(dst.Send(packet, RoomStopTokenSource.Token));
                     }
                     catch (Exception ex)
                     {
@@ -263,7 +314,7 @@ namespace Chat
                     Log.Print($"Broadcast 진행중 연결 종료 감지\n{ex}", LogLevel.ERROR);
                 }
                 Status.AddSendMessageCount(sendCount);
-                Status.AddSendByteSize(sendCount * message.GetFullBytesLength());
+                Status.AddSendByteSize(sendCount * packet.GetFullBytesLength());
             });
 
             WorkQueue.Add(new Work($"{nameof(Broadcast)}", funcTask));

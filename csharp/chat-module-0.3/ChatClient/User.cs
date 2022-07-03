@@ -27,7 +27,7 @@ namespace Chat
         public string Info { get { return $"{nameof(Cid)}: {Cid}\n{nameof(SendDelay)}: {SendDelay}\n{ConnectionContext}"; } }
 
         // https://github.com/StephenCleary/AsyncEx
-        private readonly AsyncLock _mutex = new AsyncLock();
+        private readonly AsyncLock _mutex = new();
 
         /// <summary>
         /// connectionContext는 유일한 참조를 가져야 함.
@@ -86,12 +86,15 @@ namespace Chat
                 if (string.IsNullOrEmpty(str))
                     continue;
 
-                IMessage message = new Utf8Message();
-                message.SetMessage(str);
+                Message message = new();
+                message.SetBroadcast(str);
+
+                IPacket packet = new Utf8Packet();
+                packet.Set(message);
 
                 try
                 {
-                    await Send(message);
+                    await Send(packet);
                 }
                 catch (ProtocolBufferOverflowException ex)
                 {
@@ -117,7 +120,23 @@ namespace Chat
         public async Task Connect(CancellationToken cancellationToken = default)
         {
             await ConnectionContext.Connect(cancellationToken);
-            
+
+            Message msg = new();
+            msg.SetPing();
+
+            IPacket req = new Utf8Packet();
+            req.Set(msg);
+
+            await Send(req, cancellationToken);
+            IPacket res = await Receive(cancellationToken);
+
+            Message resMsg = Serializer<Message>.Deserialize(res.GetRawString());
+
+            if (resMsg.Type != MessageType.SUCCESS)
+            {
+                throw new Exception($"서버에 연결된 줄 알았으나 최초 응답을 하지 않음.\n{res.GetInfo()}");
+            }
+                
             MustBeDisconnected = false;
         }
 
@@ -126,17 +145,17 @@ namespace Chat
             ConnectionContext.Close();
         }
 
-        public async Task Send(IMessage message, CancellationToken cancellationToken = default)
+        public async Task Send(IPacket packet, CancellationToken cancellationToken = default)
         {
-            var fullBytes = message.GetFullBytes();
+            var fullBytes = packet.GetFullBytes();
 
-            Log.Print($"송신: {message.GetInfo()}", LogLevel.INFO);
+            Log.Print($"송신: {packet.GetInfo()}", LogLevel.INFO);
 
             // 비동기 송신
             await ConnectionContext.WriteAsync(fullBytes, cancellationToken);
         }
 
-        public async Task<IMessage> Receive(CancellationToken cancellationToken = default)
+        public async Task<IPacket> Receive(CancellationToken cancellationToken = default)
         {
             byte[] sizeBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH];
             using (await _mutex.LockAsync(cancellationToken))
@@ -145,8 +164,8 @@ namespace Chat
                 byte[] fullBytes = new byte[Utf8PayloadProtocol.SIZE_BYTES_LENGTH + expectedMessageBytesLength];
                 Buffer.BlockCopy(sizeBytes, 0, fullBytes, 0, Utf8PayloadProtocol.SIZE_BYTES_LENGTH);
 
-                IMessage message = await ReceiveExpect(fullBytes, expectedMessageBytesLength, cancellationToken);
-                return message;
+                IPacket packet = await ReceiveExpect(fullBytes, expectedMessageBytesLength, cancellationToken);
+                return packet;
             }
         }
 
@@ -158,18 +177,18 @@ namespace Chat
         }
 
 
-        private async Task<IMessage> ReceiveExpect(byte[] fullBytes, int expectedMessageBytesLength, CancellationToken cancellationToken = default)
+        private async Task<IPacket> ReceiveExpect(byte[] fullBytes, int expectedMessageBytesLength, CancellationToken cancellationToken = default)
         {
-            IMessage message = new Utf8Message();
+            IPacket packet = new Utf8Packet();
 
             int offset = Utf8PayloadProtocol.SIZE_BYTES_LENGTH;
             await ReadNetworkStream(fullBytes, offset, expectedMessageBytesLength, cancellationToken);
 
-            message.SetBytes(fullBytes, offset + expectedMessageBytesLength);
+            packet.Set(fullBytes, offset + expectedMessageBytesLength);
 
-            Log.Print($"수신: {message.GetInfo()})", LogLevel.INFO);
+            Log.Print($"수신: {packet.GetInfo()})", LogLevel.INFO);
 
-            return message;
+            return packet;
         }
 
         private async Task ReadNetworkStream(byte[] fullBytes, int offset, int count, CancellationToken cancellationToken = default)

@@ -3,24 +3,31 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
 
 
 namespace Common
 {
+    using Utility;
     using Interface;
 
-    public class Utf8Message : IMessage
+    public class Utf8Packet : IPacket
     {
         private string Str = "";
         private Memory<byte> FullBytes;
 
-        public void SetMessage(string str)
+        public void Set(Message message)
+        {
+            Set(Serializer<Message>.Serialize(message));
+        }
+
+        public void Set(string str)
         {
             Str = str;
             FullBytes = Utf8PayloadProtocol.Encode(str);
         }
 
-        public void SetBytes(byte[] fullBytes, int validBytesLength)
+        public void Set(byte[] fullBytes, int validBytesLength)
         {
             Str = Utf8PayloadProtocol.Decode(fullBytes, validBytesLength);
             FullBytes = new Memory<byte>(fullBytes, 0, validBytesLength);
@@ -37,19 +44,14 @@ namespace Common
             return FullBytes.Length;
         }
 
-        public string GetMessage() 
+        public string GetRawString() 
         {
             return Str;
         }
 
-        public override string ToString()
-        {
-            return GetMessage();
-        }
-
         public string GetInfo()
         {
-            return $"Utf8Message: {Str}, Bytes: {Convert.ToHexString(FullBytes.ToArray())}, BytesLength: {GetFullBytesLength()}";
+            return $"Utf8Packet: {GetRawString()}, Bytes: {Convert.ToHexString(FullBytes.ToArray())}, BytesLength: {GetFullBytesLength()}";
         }
     }
 }

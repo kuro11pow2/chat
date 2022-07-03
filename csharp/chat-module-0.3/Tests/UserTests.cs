@@ -59,12 +59,15 @@
             FakeConnectionContext connection = new();
             User user = new(connection);
 
-            IMessage message = new Utf8Message();
-            message.SetMessage(input);
+            Message message = new();
+            message.SetBroadcast(input);
 
-            await user.Send(message);
+            IPacket packet = new Utf8Packet();
+            packet.Set(message);
+
+            await user.Send(packet);
             var output = await user.Receive();
-            var output_message = output.GetMessage();
+            var output_message = Serializer<Message>.Deserialize(output.GetRawString()).Str;
 
             Assert.Equal(expected, output_message);
         }
