@@ -1,0 +1,68 @@
+<testsuites>
+  <testsuite name="Tests.dll" tests="54" skipped="0" failures="0" errors="0" time="4.576589" timestamp="2022-07-04T14:54:32" hostname="fv-az296-18" id="0" package="Tests.dll">
+    <properties />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;abcxyz&quot;, expected: &quot;abcxyz&quot;)" time="0.0024509" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;@!#$%^()[]&quot;, expected: &quot;@!#$%^()[]&quot;)" time="0.0000111" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;😂🤣⛴🛬🎁&quot;, expected: &quot;😂🤣⛴🛬🎁&quot;)" time="0.0000039" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;12341234123412341234123412341234123412341234123412&quot;..., expected: &quot;12341234123412341234123412341234123412341234123412&quot;...)" time="0.0000088" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;가나다뀕팛&quot;, expected: &quot;가나다뀕팛&quot;)" time="0.0000028" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;0123&quot;, expected: &quot;0123&quot;)" time="0.0000023" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8StringPacketTest(input: &quot;11110000111100001111000011110000111100001111000011&quot;..., expected: &quot;11110000111100001111000011110000111100001111000011&quot;...)" time="0.0000038" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;@!#$%^()[]&quot;, expected: &quot;@!#$%^()[]&quot;)" time="0.0347848" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;😂🤣⛴🛬🎁&quot;, expected: &quot;😂🤣⛴🛬🎁&quot;)" time="0.0002107" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;0123&quot;, expected: &quot;0123&quot;)" time="0.0000159" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;abcxyz&quot;, expected: &quot;abcxyz&quot;)" time="0.0000143" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;12341234123412341234123412341234123412341234123412&quot;..., expected: &quot;12341234123412341234123412341234123412341234123412&quot;...)" time="0.0000239" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;가나다뀕팛&quot;, expected: &quot;가나다뀕팛&quot;)" time="0.0000252" />
+    <testcase classname="Tests.Utf8PacketTests" name="Utf8MessagePacketTest(input: &quot;11110000111100001111000011110000111100001111000011&quot;..., expected: &quot;11110000111100001111000011110000111100001111000011&quot;...)" time="0.0000181" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;abcxyz&quot;, expected: &quot;abcxyz&quot;)" time="0.0761339" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;12341234123412341234123412341234123412341234123412&quot;..., expected: &quot;12341234123412341234123412341234123412341234123412&quot;...)" time="0.0059990" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;0123&quot;, expected: &quot;0123&quot;)" time="0.0002371" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;😂🤣⛴🛬🎁&quot;, expected: &quot;😂🤣⛴🛬🎁&quot;)" time="0.0002169" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;11110000111100001111000011110000111100001111000011&quot;..., expected: &quot;11110000111100001111000011110000111100001111000011&quot;...)" time="0.0002200" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;가나다뀕팛&quot;, expected: &quot;가나다뀕팛&quot;)" time="0.0002014" />
+    <testcase classname="Tests.UserTests" name="ChatUserTest(input: &quot;@!#$%^()[]&quot;, expected: &quot;@!#$%^()[]&quot;)" time="0.0001952" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;31323334313233343132333431323334313233343132333431&quot;..., expected: &quot;12341234123412341234123412341234123412341234123412&quot;...)" time="0.0002150" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;30313233&quot;, expected: &quot;0123&quot;)" time="0.0000090" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;f09f9882f09fa4a3e29bb4f09f9bacf09f8e81&quot;, expected: &quot;😂🤣⛴🛬🎁&quot;)" time="0.0000071" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;eab080eb8298eb8ba4eb8095ed8c9b&quot;, expected: &quot;가나다뀕팛&quot;)" time="0.0000041" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;31313131303030303131313130303030313131313030303031&quot;..., expected: &quot;11110000111100001111000011110000111100001111000011&quot;...)" time="0.0000058" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;61626378797a&quot;, expected: &quot;abcxyz&quot;)" time="0.0000041" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeTest(input: &quot;40212324255e28295b5d&quot;, expected: &quot;@!#$%^()[]&quot;)" time="0.0000038" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;가나다뀕팛&quot;, expected: &quot;eab080eb8298eb8ba4eb8095ed8c9b&quot;)" time="0.0001023" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;😂🤣⛴🛬🎁&quot;, expected: &quot;f09f9882f09fa4a3e29bb4f09f9bacf09f8e81&quot;)" time="0.0000141" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;11110000111100001111000011110000111100001111000011&quot;..., expected: &quot;31313131303030303131313130303030313131313030303031&quot;...)" time="0.0000072" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;@!#$%^()[]&quot;, expected: &quot;40212324255e28295b5d&quot;)" time="0.0000041" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;abcxyz&quot;, expected: &quot;61626378797a&quot;)" time="0.0000038" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;12341234123412341234123412341234123412341234123412&quot;..., expected: &quot;31323334313233343132333431323334313233343132333431&quot;...)" time="0.0000202" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeTest(input: &quot;0123&quot;, expected: &quot;30313233&quot;)" time="0.0000038" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeSizeBytesTest(input: &quot;0600&quot;, expected: 6)" time="0.0254286" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeSizeBytesTest(input: &quot;0c00&quot;, expected: 12)" time="0.0000340" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeSizeBytesTest(input: &quot;0a00&quot;, expected: 10)" time="0.0000038" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeSizeBytesTest(input: &quot;0f00&quot;, expected: 15)" time="0.0000029" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeSizeBytesTest(input: &quot;0400&quot;, expected: 4)" time="0.0000028" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_DecodeSizeBytesTest(input: &quot;1300&quot;, expected: 19)" time="0.0000030" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeSizeBytesTest(input: 4, expected: &quot;0400&quot;)" time="0.0001052" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeSizeBytesTest(input: 19, expected: &quot;1300&quot;)" time="0.0000032" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeSizeBytesTest(input: 12, expected: &quot;0c00&quot;)" time="0.0000026" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeSizeBytesTest(input: 15, expected: &quot;0f00&quot;)" time="0.0000025" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeSizeBytesTest(input: 10, expected: &quot;0a00&quot;)" time="0.0000023" />
+    <testcase classname="Tests.Utf8PayloadProtocolTests" name="Utf8PayloadProtocol_EncodeSizeBytesTest(input: 6, expected: &quot;0600&quot;)" time="0.0000022" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;11110000111100001111000011110000111100001111000011&quot;..., expected: &quot;11110000111100001111000011110000111100001111000011&quot;...)" time="1.4137727" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;12341234123412341234123412341234123412341234123412&quot;..., expected: &quot;12341234123412341234123412341234123412341234123412&quot;...)" time="1.0878906" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;😂🤣⛴🛬🎁&quot;, expected: &quot;😂🤣⛴🛬🎁&quot;)" time="0.4949690" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;abcxyz&quot;, expected: &quot;abcxyz&quot;)" time="0.3927617" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;@!#$%^()[]&quot;, expected: &quot;@!#$%^()[]&quot;)" time="0.3972544" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;가나다뀕팛&quot;, expected: &quot;가나다뀕팛&quot;)" time="0.2526948" />
+    <testcase classname="Tests.RoomQTests" name="LocalRoomQTest(input: &quot;0123&quot;, expected: &quot;0123&quot;)" time="0.3904683" />
+    <system-out>
+Test Framework Informational Messages:
+[xUnit.net 00:00:00.01] xUnit.net VSTest Adapter v2.4.3+1b45f5407b (64-bit .NET 6.0.6)
+[xUnit.net 00:00:00.79]   Discovering: Tests
+[xUnit.net 00:00:00.88]   Discovered:  Tests
+[xUnit.net 00:00:00.89]   Starting:    Tests
+[xUnit.net 00:00:05.57]   Finished:    Tests
+</system-out>
+    <system-err></system-err>
+  </testsuite>
+</testsuites>
