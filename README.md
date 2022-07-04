@@ -26,11 +26,10 @@ flowchart TD
 
     UserManager  --> |sid:user| UserRepository
     UserManager  --> |user:sid| UserRepository
-    UserManager  --> |uid:user| UserRepository
 
     UserManager --> |all bytes:message| Encoder
     UserManager --> |message:all bytes| Encoder
 
-    UserManager --> |uid, message:| BusinessLogic
+    UserManager --> |user, message:| BusinessLogic
 
 ```
