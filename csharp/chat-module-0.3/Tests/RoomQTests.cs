@@ -13,7 +13,7 @@
         public static async Task LocalRoomQTest(string input, string expected)
         {
             Config config = new();
-            int userCount = 30;
+            int userCount = 100;
 
             RoomQ room = new(config.Port);
             _ = room.Run();
@@ -88,7 +88,7 @@
         public static async Task RemoteRoomQTest(string input, string expected)
         {
             Config config = new();
-            int userCount = 50;
+            int userCount = 100;
 
             List<User> users = new();
             for (int i = 0; i < userCount; i++)
@@ -108,13 +108,13 @@
             for (int i = 0; i < users.Count; i++)
             {
                 int idx = i;
-                await users[idx].Send(packet);
+                _ = users[idx].Send(packet);
             }
+
+            List<Task> tasks = new();
 
             for (int i = 0; i < users.Count; i++)
             {
-                List<Task> tasks = new();
-
                 for (int j = 0; j < users.Count; j++)
                 {
                     int idx = j;
@@ -132,9 +132,9 @@
                         }
                     }));
                 }
-
-                await Task.WhenAll(tasks);
             }
+
+            await Task.WhenAll(tasks);
 
             foreach (var user in users)
             {
