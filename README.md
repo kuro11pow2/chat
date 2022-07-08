@@ -21,15 +21,24 @@ flowchart TD
     Listener --> |cid:| ConnectionManager
     ConnectionManager --> |:| Connection_Receiver
 
-    ConnectionManager --> |cid, all bytes:| UserManager
-    UserManager --> |cid, all bytes:| ConnectionManager
+    ConnectionManager --> |cid, all bytes:| SessionManager
+    SessionManager --> |cid, all bytes:| ConnectionManager
 
-    UserManager  --> |cid:user| UserRepository
-    UserManager  --> |user:cid| UserRepository
+    SessionManager --> |sid, all bytes:| UserManager
+    UserManager --> |sid, all bytes:| SessionManager
+
+    SessionManager --> |cid:sid| SessionRepository
+    SessionManager --> |sid:cid| SessionRepository
+    SessionManager --> |cid, all bytes:bool| AuthManager
+
+    UserManager  --> |sid:user| UserRepository
+    UserManager  --> |user:sid| UserRepository
 
     UserManager --> |all bytes:message| Encoder
     UserManager --> |message:all bytes| Encoder
 
     UserManager --> |user, message:| BusinessLogic
+
+    
 
 ```
