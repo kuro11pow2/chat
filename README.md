@@ -8,24 +8,24 @@
 
 ```mermaid
 flowchart TD
-    Environment --> |some bytes:| Session_Receiver
-    Session_Sender --> |all bytes:| Environment
-    Session_Receiver --> |all bytes:| SessionManager
-    SessionManager --> |all bytes:| Session_Sender
+    Environment --> |some bytes:| Connection_Receiver
+    Connection_Sender --> |all bytes:| Environment
+    Connection_Receiver --> |all bytes:| ConnectionManager
+    ConnectionManager --> |all bytes:| Connection_Sender
     
-    SessionManager --> |sid:Session_Sender| SessionRepository
-    SessionManager --> |Session_Receiver:sid| SessionRepository
+    ConnectionManager --> |cid:Connection_Sender| ConnectionRepository
+    ConnectionManager --> |Connection_Receiver:cid| ConnectionRepository
 
-    Listener --> |sid, session:| SessionRepository
-    Listener --> |:session_info| SessionRepository
-    Listener --> |sid:| SessionManager
-    SessionManager --> |:| Session_Receiver
+    Listener --> |cid, Connection:| ConnectionRepository
+    Listener --> |:Connection_info| ConnectionRepository
+    Listener --> |cid:| ConnectionManager
+    ConnectionManager --> |:| Connection_Receiver
 
-    SessionManager --> |sid, all bytes:| UserManager
-    UserManager --> |sid, all bytes:| SessionManager
+    ConnectionManager --> |cid, all bytes:| UserManager
+    UserManager --> |cid, all bytes:| ConnectionManager
 
-    UserManager  --> |sid:user| UserRepository
-    UserManager  --> |user:sid| UserRepository
+    UserManager  --> |cid:user| UserRepository
+    UserManager  --> |user:cid| UserRepository
 
     UserManager --> |all bytes:message| Encoder
     UserManager --> |message:all bytes| Encoder
