@@ -24,18 +24,17 @@ flowchart TD
     ConnectionManager --> |cid, all bytes:| SessionManager
     SessionManager --> |cid, all bytes:| ConnectionManager
 
-    SessionManager --> |sid, all bytes:| BusinessLogicManager
-    BusinessLogicManager --> |sid, all bytes:| SessionManager
-
     SessionManager --> |cid:sid| SessionRepository
     SessionManager --> |sid:cid| SessionRepository
     SessionManager --> |cid, all bytes:bool| Auth
 
-    BusinessLogicManager  --> |sid:user| UserRepository
-    BusinessLogicManager  --> |user:sid| UserRepository
+    SessionManager --> |sid, all bytes:| BusinessLogic
+    BusinessLogic --> |sid, all bytes:| SessionManager
 
-    BusinessLogicManager --> |all bytes:message| Encoder
-    BusinessLogicManager --> |message:all bytes| Encoder
+    subgraph BusinessLogic
+    end
+
+    
 
     
 
