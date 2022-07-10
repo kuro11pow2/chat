@@ -22,14 +22,12 @@ flowchart TD
     ConnectionManager --> |:| Connection_Receiver
 
     ConnectionManager --> |cid, all bytes:| SessionManager
-    SessionManager --> |cid, all bytes:| ConnectionManager
 
     SessionManager --> |cid:sid| SessionRepository
     SessionManager --> |sid:cid| SessionRepository
     SessionManager --> |cid, all bytes:bool| Auth
 
     SessionManager --> |sid, all bytes:| BusinessLogic
-    BusinessLogic --> |sid, all bytes:| SessionManager
 
     subgraph BusinessLogic
     end
